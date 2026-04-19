@@ -5,152 +5,154 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 gsap.registerPlugin(ScrollTrigger);
 
 const FEATURES = [
-  { icon: "📅", title: "Daily Activity Tracker", desc: "Check off routines every day. See streaks build as you stay consistent with your habits." },
-  { icon: "📊", title: "Monthly Progress Calendar", desc: "A full visual grid of every day this month — color-coded completions at a glance." },
-  { icon: "📝", title: "Notes & Q&A Organizer", desc: "Save questions and answers by category. Attach links, mark the best answers, and search instantly." },
-  { icon: "🕌", title: "Qaza Namaz Tracker", desc: "Keep an accurate count of missed prayers and track your make-up progress over time." },
-  { icon: "📌", title: "Quick Sticky Notes", desc: "Pin colorful notes right on your dashboard. Always visible, instantly editable." },
-  { icon: "💾", title: "Data Export", desc: "Export all your activity data whenever you need it — your data, always under your control." },
+  {
+    title: "Activities",
+    desc: "Daily check-offs, streaks, and a month view that fills in as you go.",
+  },
+  {
+    title: "Notes & Q&A",
+    desc: "Categories, links, best-answer marking, and instant search across everything you save.",
+  },
+  {
+    title: "Qaza Namaz",
+    desc: "A quiet place to count missed prayers and track your progress over time.",
+  },
+  {
+    title: "Expenses",
+    desc: "Monthly ledger with category rollups. Know where every rupee went.",
+  },
+  {
+    title: "Books",
+    desc: "Reading dashboard, progress tracking, page notes, and highlights in one place.",
+  },
+  {
+    title: "Sticky notes",
+    desc: "Quick colored notes pinned to your dashboard. Always visible, instantly editable.",
+  },
 ];
 
 const PLANS = [
   {
-    name: "Free", price: "$0", period: "forever", badge: null,
-    features: ["Up to 5 daily activities","Monthly calendar view","Basic notes (10 max)","Qaza Namaz tracker","Community support"],
-    cta: "Get Started Free", ctaStyle: "outline",
+    name: "Free", price: "$0", period: "for keeping your own days",
+    badge: null, ctaStyle: "outline", cta: "Get started",
+    features: ["Up to 5 daily activities", "Monthly calendar view", "10 notes", "Qaza Namaz tracker"],
   },
   {
-    name: "Pro", price: "$4", period: "per month", badge: "Most Popular",
-    features: ["Unlimited activities","Full progress analytics","Unlimited notes & answers","Sticky notes panel","Data export","Priority support"],
-    cta: "Start Pro", ctaStyle: "solid",
+    name: "Pro", price: "$4", period: "per month",
+    badge: "Most popular", ctaStyle: "solid", cta: "Start Pro",
+    features: ["Unlimited activities", "Unlimited notes", "Expenses & books", "Data export", "Priority support"],
   },
   {
-    name: "Team", price: "$12", period: "per month", badge: null,
-    features: ["Everything in Pro","Up to 5 accounts","Shared activity boards","Admin dashboard","Dedicated support"],
-    cta: "Contact Us", ctaStyle: "outline",
+    name: "Team", price: "$12", period: "per month",
+    badge: null, ctaStyle: "outline", cta: "Contact us",
+    features: ["Everything in Pro", "Up to 5 accounts", "Shared activity boards", "Admin dashboard"],
   },
 ];
 
 function LandingPage({ onGetStarted, onLogin }) {
-  const rootRef = useRef(null);
-  const navRef  = useRef(null);
-  const badgeRef = useRef(null);
-  const titleRef = useRef(null);
-  const subRef   = useRef(null);
-  const ctasRef  = useRef(null);
-  const noteRef  = useRef(null);
+  const rootRef   = useRef(null);
+  const navRef    = useRef(null);
+  const titleRef  = useRef(null);
+  const subRef    = useRef(null);
+  const ctasRef   = useRef(null);
   const mockupRef = useRef(null);
-  const heroRef  = useRef(null);
-  const glow1Ref = useRef(null);
-  const glow2Ref = useRef(null);
+  const heroRef   = useRef(null);
   const featureCardsRef = useRef([]);
   const pricingCardsRef = useRef([]);
   const featuresSectionRef = useRef(null);
   const pricingSectionRef  = useRef(null);
-  const orb1Ref = useRef(null);
-  const orb2Ref = useRef(null);
-  const orb3Ref = useRef(null);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      gsap.from(navRef.current, { y: -80, opacity: 0, duration: 0.8, ease: "power3.out" });
+      gsap.from(navRef.current, { y: -60, opacity: 0, duration: 0.6, ease: "power3.out" });
 
-      const heroTl = gsap.timeline({ delay: 0.2 });
-      heroTl
-        .from(badgeRef.current, { y: 30, opacity: 0, scale: 0.85, duration: 0.6, ease: "back.out(1.7)" })
-        .from(titleRef.current.querySelectorAll(".lp-title-word"), { y: 80, opacity: 0, rotationX: -60, transformOrigin: "0% 50% -40px", duration: 0.8, stagger: 0.12, ease: "power4.out" }, "-=0.2")
-        .from(subRef.current,  { y: 30, opacity: 0, duration: 0.7, ease: "power3.out" }, "-=0.4")
-        .from(ctasRef.current.children, { y: 20, opacity: 0, scale: 0.9, duration: 0.6, stagger: 0.1, ease: "back.out(1.4)" }, "-=0.3")
-        .from(noteRef.current, { opacity: 0, duration: 0.5, ease: "power2.out" }, "-=0.2")
-        .from(mockupRef.current, { x: 120, opacity: 0, rotationY: 30, scale: 0.88, duration: 1.0, ease: "power3.out" }, "-=1.0");
+      const tl = gsap.timeline({ delay: 0.15 });
+      tl
+        .from(titleRef.current, { y: 40, opacity: 0, duration: 0.7, ease: "power3.out" })
+        .from(subRef.current,   { y: 24, opacity: 0, duration: 0.6, ease: "power3.out" }, "-=0.4")
+        .from(ctasRef.current?.children ?? [], { y: 18, opacity: 0, scale: 0.95, duration: 0.5, stagger: 0.1, ease: "power3.out" }, "-=0.3")
+        .from(mockupRef.current, { x: 80, opacity: 0, duration: 0.8, ease: "power3.out" }, "-=0.8");
 
-      gsap.to(mockupRef.current, { y: -14, duration: 3.2, repeat: -1, yoyo: true, ease: "sine.inOut" });
-
-      if (orb1Ref.current) gsap.to(orb1Ref.current, { x: 80, y: -60, duration: 9, repeat: -1, yoyo: true, ease: "sine.inOut" });
-      if (orb2Ref.current) gsap.to(orb2Ref.current, { x: -60, y: 80, duration: 11, repeat: -1, yoyo: true, ease: "sine.inOut", delay: -4 });
-      if (orb3Ref.current) gsap.to(orb3Ref.current, { x: 50, y: 50, duration: 13, repeat: -1, yoyo: true, ease: "sine.inOut", delay: -7 });
+      gsap.to(mockupRef.current, { y: -10, duration: 3.5, repeat: -1, yoyo: true, ease: "sine.inOut" });
 
       featureCardsRef.current.forEach((card, i) => {
         if (!card) return;
         gsap.from(card, {
-          scrollTrigger: { trigger: card, start: "top 85%", toggleActions: "play none none none" },
-          y: 60, opacity: 0, scale: 0.92, rotationX: 12, transformOrigin: "50% 100%",
-          duration: 0.7, delay: i * 0.08, ease: "power3.out",
+          scrollTrigger: { trigger: card, start: "top 88%", toggleActions: "play none none none" },
+          y: 40, opacity: 0, duration: 0.6, delay: i * 0.07, ease: "power3.out",
         });
       });
 
       gsap.from(featuresSectionRef.current?.querySelectorAll(".lp-section-label, .lp-section-title, .lp-section-sub") ?? [], {
-        scrollTrigger: { trigger: featuresSectionRef.current, start: "top 80%" },
-        y: 40, opacity: 0, duration: 0.7, stagger: 0.12, ease: "power3.out",
+        scrollTrigger: { trigger: featuresSectionRef.current, start: "top 82%" },
+        y: 32, opacity: 0, duration: 0.6, stagger: 0.1, ease: "power3.out",
       });
 
       pricingCardsRef.current.forEach((card, i) => {
         if (!card) return;
         gsap.from(card, {
           scrollTrigger: { trigger: card, start: "top 88%", toggleActions: "play none none none" },
-          y: 70, opacity: 0, scale: 0.9, duration: 0.75, delay: i * 0.12, ease: "back.out(1.2)",
+          y: 48, opacity: 0, duration: 0.65, delay: i * 0.1, ease: "power3.out",
         });
       });
 
       gsap.from(pricingSectionRef.current?.querySelectorAll(".lp-section-label, .lp-section-title, .lp-section-sub") ?? [], {
-        scrollTrigger: { trigger: pricingSectionRef.current, start: "top 80%" },
-        y: 40, opacity: 0, duration: 0.7, stagger: 0.12, ease: "power3.out",
+        scrollTrigger: { trigger: pricingSectionRef.current, start: "top 82%" },
+        y: 32, opacity: 0, duration: 0.6, stagger: 0.1, ease: "power3.out",
       });
     }, rootRef);
 
-    const hero   = heroRef.current;
-    const mockup = mockupRef.current;
-    if (!hero || !mockup) return () => ctx.revert();
-
-    const handleMouseMove = (e) => {
-      const { left, top, width, height } = hero.getBoundingClientRect();
-      const x = (e.clientX - left) / width - 0.5;
-      const y = (e.clientY - top) / height - 0.5;
-      gsap.to(mockup, { rotationY: x * 22, rotationX: -y * 16, duration: 0.5, ease: "power2.out", transformPerspective: 900 });
-      if (glow1Ref.current) gsap.to(glow1Ref.current, { x: x * 60, y: y * 40, duration: 1.2, ease: "power2.out" });
-      if (glow2Ref.current) gsap.to(glow2Ref.current, { x: -x * 40, y: -y * 30, duration: 1.5, ease: "power2.out" });
-    };
-
-    const handleMouseLeave = () => {
-      gsap.to(mockup, { rotationY: -4, rotationX: 2, duration: 0.8, ease: "elastic.out(1, 0.5)", transformPerspective: 900 });
-    };
-
-    hero.addEventListener("mousemove", handleMouseMove);
-    hero.addEventListener("mouseleave", handleMouseLeave);
-
-    return () => {
-      ctx.revert();
-      hero.removeEventListener("mousemove", handleMouseMove);
-      hero.removeEventListener("mouseleave", handleMouseLeave);
-    };
+    return () => ctx.revert();
   }, []);
 
-  const scrollToFeatures = () => {
+  const scrollToFeatures = () =>
     document.getElementById("features")?.scrollIntoView({ behavior: "smooth" });
-  };
 
   return (
-    <div ref={rootRef} className="min-h-screen bg-white font-[Inter,system-ui,-apple-system,sans-serif] overflow-x-hidden">
+    <div ref={rootRef} style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--fg)", fontFamily: "var(--font-sans)", overflowX: "hidden" }}>
+
       {/* ── Navbar ── */}
-      <nav ref={navRef} className="sticky top-0 z-[100] bg-white/85 backdrop-blur-[12px] border-b border-[#f1f5f9]">
-        <div className="max-w-[1200px] mx-auto px-6 py-4 flex items-center justify-between">
-          <span className="flex items-center gap-2 text-[1.2rem] font-extrabold text-[#0f172a] tracking-[-0.02em]">
-            <span className="text-[1.4rem]">📊</span>
-            Activity Tracker
+      <nav ref={navRef} style={{
+        position: "sticky", top: 0, zIndex: 100,
+        background: "var(--glass-bg)",
+        backdropFilter: "var(--glass-blur)",
+        WebkitBackdropFilter: "var(--glass-blur)",
+        borderBottom: "1px solid var(--border)",
+      }}>
+        <div style={{ maxWidth: 1180, margin: "0 auto", padding: "16px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <img src="/rhythm-logo.svg" alt="Rhythm" width={24} height={24} style={{ borderRadius: 6 }} />
+            <span style={{ fontFamily: "var(--font-display)", fontWeight: 500, fontSize: 19, letterSpacing: "-0.02em", color: "var(--fg)" }}>
+              Rhythm
+            </span>
           </span>
-          <div className="flex items-center gap-3">
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button
-              className="px-4 py-2 bg-transparent border border-[#e2e8f0] rounded-[10px] text-[0.875rem] font-semibold text-[#64748b] cursor-pointer transition-all duration-200 hover:bg-[#f8fafc] hover:border-[#6366f1] hover:text-[#6366f1]"
               onClick={onLogin}
+              style={{
+                padding: "8px 16px", background: "transparent",
+                border: "1px solid var(--border)", borderRadius: "var(--r-md)",
+                fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 500,
+                color: "var(--fg-muted)", cursor: "pointer",
+                transition: "background var(--dur-fast), color var(--dur-fast)",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = "var(--bg-raised-hover)"; e.currentTarget.style.color = "var(--fg)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--fg-muted)"; }}
             >
-              Login
+              Sign in
             </button>
             <button
-              className="px-4 py-2 border-none rounded-[10px] text-[0.875rem] font-semibold text-white cursor-pointer transition-all duration-200 hover:opacity-90 hover:translate-y-[-1px]"
-              style={{ background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)" }}
               onClick={onGetStarted}
+              style={{
+                padding: "9px 18px", background: "var(--accent)", color: "var(--accent-fg)",
+                border: "none", borderRadius: "var(--r-md)",
+                fontFamily: "var(--font-sans)", fontSize: 13, fontWeight: 500,
+                cursor: "pointer", transition: "background var(--dur-fast) var(--ease)",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = "var(--accent-hover)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "var(--accent)"; }}
             >
-              Get Started
+              Get started
             </button>
           </div>
         </div>
@@ -159,159 +161,147 @@ function LandingPage({ onGetStarted, onLogin }) {
       {/* ── Hero ── */}
       <section
         ref={heroRef}
-        className="relative overflow-hidden min-h-[calc(100vh-72px)] flex items-center"
-        style={{ background: "linear-gradient(160deg, #f9fafb 0%, #eef2ff 50%, #f0fdf4 100%)" }}
+        style={{ minHeight: "calc(100vh - 58px)", display: "flex", alignItems: "center", position: "relative", overflow: "hidden" }}
       >
-        {/* Ambient glows */}
-        <div ref={glow1Ref} className="absolute rounded-full pointer-events-none blur-[120px]"
-          style={{ width: 600, height: 600, background: "rgba(99,102,241,0.15)", top: -200, left: -200 }} />
-        <div ref={glow2Ref} className="absolute rounded-full pointer-events-none blur-[100px]"
-          style={{ width: 500, height: 500, background: "rgba(16,185,129,0.12)", bottom: -150, right: -100 }} />
+        {/* Subtle dot grid */}
+        <div className="lp-dot-grid" style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: 0.5 }} />
 
-        {/* 3D orbs */}
-        <div ref={orb1Ref} className="absolute rounded-full pointer-events-none blur-[2px]"
-          style={{ width: 140, height: 140, top: "15%", right: "25%",
-            background: "radial-gradient(circle at 35% 35%, rgba(99,102,241,0.5), rgba(99,102,241,0.04))",
-            boxShadow: "inset 0 0 40px rgba(99,102,241,0.2), 0 8px 32px rgba(99,102,241,0.15)" }} />
-        <div ref={orb2Ref} className="absolute rounded-full pointer-events-none blur-[2px]"
-          style={{ width: 90, height: 90, bottom: "20%", left: "10%",
-            background: "radial-gradient(circle at 35% 35%, rgba(16,185,129,0.5), rgba(16,185,129,0.04))",
-            boxShadow: "inset 0 0 28px rgba(16,185,129,0.2), 0 6px 24px rgba(16,185,129,0.12)" }} />
-        <div ref={orb3Ref} className="absolute rounded-full pointer-events-none blur-[2px]"
-          style={{ width: 60, height: 60, top: "65%", right: "12%",
-            background: "radial-gradient(circle at 35% 35%, rgba(245,158,11,0.55), rgba(245,158,11,0.04))",
-            boxShadow: "inset 0 0 20px rgba(245,158,11,0.2)" }} />
+        <div style={{ maxWidth: 1180, margin: "0 auto", padding: "64px 24px", display: "grid", gridTemplateColumns: "1fr auto", gap: 64, alignItems: "center", width: "100%" }}>
+          <div style={{ maxWidth: 580 }}>
+            <div className="eyebrow" style={{ marginBottom: 18 }}>A quieter way to keep your days</div>
 
-        {/* Dot grid */}
-        <div className="lp-dot-grid absolute inset-0 pointer-events-none opacity-60" />
-
-        <div className="max-w-[1200px] mx-auto px-6 py-24 grid grid-cols-[1fr_auto] gap-16 items-center w-full max-lg:grid-cols-1">
-          <div className="max-w-[580px]">
-            <div ref={badgeRef}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-[0.85rem] font-semibold mb-6"
-              style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)", color: "#6366f1" }}
-            >
-              ✨ Your Personal Growth Dashboard
-            </div>
-
-            <h1 ref={titleRef} className="text-[3.5rem] font-extrabold leading-[1.08] tracking-[-0.04em] text-[#0f172a] m-0 mb-6 max-md:text-[2.2rem]">
-              <span className="lp-title-line block">
-                <span className="lp-title-word">Track Every Habit.</span>
-              </span>
-              <br />
-              <span className="lp-title-line block">
-                <span className="lp-title-word" style={{
-                  background: "linear-gradient(135deg, #6366f1, #10b981)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}>Build Every Day.</span>
-              </span>
+            <h1 ref={titleRef} style={{ fontFamily: "var(--font-display)", fontWeight: 500, fontSize: "clamp(38px, 6vw, 64px)", letterSpacing: "-0.025em", lineHeight: 1.05, margin: "0 0 20px", color: "var(--fg)" }}>
+              Track habits, prayers, notes, and spending in one calm dashboard.
             </h1>
 
-            <p ref={subRef} className="text-[1.05rem] text-[#64748b] leading-[1.7] m-0 mb-8">
-              A beautiful all-in-one tracker for your daily routines, prayers, notes, and personal growth — synced to the cloud and accessible anywhere.
+            <p ref={subRef} style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-md)", color: "var(--fg-muted)", lineHeight: 1.6, margin: "0 0 28px", maxWidth: 500 }}>
+              No streak-shaming. No confetti. Just a quiet place to record what matters, and see it build over time.
             </p>
 
-            <div ref={ctasRef} className="flex items-center gap-4 flex-wrap">
+            <div ref={ctasRef} style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               <button
-                className="px-7 py-[0.875rem] border-none rounded-[12px] text-base font-bold text-white cursor-pointer transition-all duration-200 hover:opacity-90 hover:translate-y-[-2px] hover:shadow-[0_12px_32px_rgba(99,102,241,0.35)]"
-                style={{ background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)" }}
                 onClick={onGetStarted}
+                style={{
+                  padding: "13px 24px", background: "var(--accent)", color: "#fff",
+                  border: "none", borderRadius: "var(--r-md)",
+                  fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 500,
+                  cursor: "pointer", transition: "background var(--dur-fast) var(--ease)",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--accent-hover)"}
+                onMouseLeave={e => e.currentTarget.style.background = "var(--accent)"}
               >
-                Get Started Free →
+                Start for free
               </button>
               <button
-                className="px-7 py-[0.875rem] border border-[#e2e8f0] rounded-[12px] text-base font-semibold text-[#475569] bg-transparent cursor-pointer transition-all duration-200 hover:border-[#6366f1] hover:text-[#6366f1] hover:bg-[#f8fafc]"
                 onClick={scrollToFeatures}
+                style={{
+                  padding: "12px 24px", background: "transparent",
+                  border: "1px solid var(--border-strong)", borderRadius: "var(--r-md)",
+                  fontFamily: "var(--font-sans)", fontSize: 14, fontWeight: 500,
+                  color: "var(--fg)", cursor: "pointer",
+                  transition: "background var(--dur-fast)",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "var(--bg-raised-hover)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
               >
-                See Features ↓
+                See what's inside
               </button>
             </div>
 
-            <p ref={noteRef} className="text-[0.82rem] text-[#94a3b8] mt-4 m-0">
-              No credit card required · Free forever plan available
+            <p style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-xs)", color: "var(--fg-faint)", marginTop: 14 }}>
+              No credit card required · Free plan always available
             </p>
           </div>
 
-          {/* 3D UI Mockup */}
-          <div className="relative max-lg:hidden">
-            <div ref={mockupRef}
-              className="w-[340px] rounded-2xl overflow-hidden"
-              style={{ boxShadow: "0 40px 80px rgba(0,0,0,0.18), 0 8px 24px rgba(99,102,241,0.12)", transform: "rotateY(-4deg) rotateX(2deg)", transformStyle: "preserve-3d" }}
+          {/* Dashboard mockup */}
+          <div style={{ position: "relative" }} className="max-lg:hidden">
+            <div
+              ref={mockupRef}
+              style={{
+                width: 320, borderRadius: "var(--r-xl)",
+                border: "1px solid var(--border)",
+                background: "var(--bg-raised)",
+                boxShadow: "var(--shadow-lg)",
+                overflow: "hidden",
+              }}
             >
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-[#f1f5f9]"
-                style={{ background: "linear-gradient(135deg, #f8fafc, #f1f5f9)" }}
-              >
-                {[{ c: "#ef4444" }, { c: "#f59e0b" }, { c: "#10b981" }].map(({ c }, i) => (
-                  <span key={i} className="w-3 h-3 rounded-full" style={{ background: c }} />
-                ))}
-                <span className="ml-3 text-xs font-semibold text-[#64748b] flex-1 text-center">Dashboard</span>
+              {/* Mock topbar */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px", borderBottom: "1px solid var(--border-faint)", background: "var(--bg)" }}>
+                <div style={{ width: 16, height: 16, borderRadius: 4, background: "var(--accent)" }} />
+                <span style={{ fontFamily: "var(--font-display)", fontSize: 13, fontWeight: 500, color: "var(--fg)", letterSpacing: "-0.01em" }}>Rhythm</span>
+                <span style={{ marginLeft: "auto", fontFamily: "var(--font-sans)", fontSize: 11, color: "var(--fg-muted)" }}>April 2026</span>
               </div>
-              <div className="p-4" style={{ background: "linear-gradient(180deg, #ffffff, #f8fafc)" }}>
-                <div className="flex items-center justify-between p-3 rounded-xl mb-3 bg-gradient-to-r from-[#6366f1] to-[#4f46e5] text-white">
-                  <div>
-                    <div className="text-[0.65rem] opacity-80 font-semibold uppercase tracking-wider">Today&apos;s Progress</div>
-                    <div className="text-sm font-bold mt-0.5">12 / 18 activities</div>
+              {/* Mock content */}
+              <div style={{ padding: "14px" }}>
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+                    <span style={{ fontFamily: "var(--font-display)", fontSize: 13, fontWeight: 500, color: "var(--fg)" }}>Today&apos;s progress</span>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 600, color: "var(--accent)" }}>67%</span>
                   </div>
-                  <div className="text-2xl font-extrabold">67%</div>
+                  <div style={{ height: 4, borderRadius: 999, background: "var(--border-faint)", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: "67%", background: "var(--accent)", borderRadius: 999 }} />
+                  </div>
                 </div>
-                <div className="h-1.5 rounded-full bg-[#e2e8f0] mb-3 overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: "67%", background: "linear-gradient(90deg, #6366f1, #10b981)" }} />
-                </div>
-                <div className="grid grid-cols-2 gap-1.5 mb-3">
-                  {["Fajr ✓","Quran ✓","Tajweed ✓","Dua ✓","Zohar","Asr","Maghrib ✓","Isha"].map(item => (
-                    <div key={item}
-                      className={`px-2 py-1 rounded-md text-[0.7rem] font-semibold ${item.includes("✓") ? "bg-[#6366f1] text-white" : "bg-[#f1f5f9] text-[#64748b]"}`}
-                    >
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
+                  {["Fajr ✓", "Quran ✓", "Tajweed ✓", "Dua ✓", "Zohar", "Asr"].map((item, i) => (
+                    <div key={i} style={{
+                      padding: "6px 8px", borderRadius: "var(--r-sm)", fontSize: 11, fontFamily: "var(--font-sans)", fontWeight: 500,
+                      background: item.includes("✓") ? "var(--accent-weak)" : "var(--bg-sunken)",
+                      color: item.includes("✓") ? "var(--accent)" : "var(--fg-muted)",
+                      border: `1px solid ${item.includes("✓") ? "color-mix(in srgb, var(--accent) 20%, transparent)" : "var(--border-faint)"}`,
+                    }}>
                       {item}
                     </div>
                   ))}
                 </div>
-                <div className="flex gap-1">
+                {/* Mini calendar strip */}
+                <div style={{ display: "flex", gap: 4 }}>
                   {["M","T","W","T","F","S","S"].map((d, i) => (
-                    <div key={i}
-                      className={`flex-1 py-1.5 rounded text-[0.6rem] font-bold text-center ${i < 5 ? "bg-[#6366f1] text-white" : "bg-[#f1f5f9] text-[#94a3b8]"}`}
-                    >
-                      {d}
-                    </div>
+                    <div key={i} style={{
+                      flex: 1, padding: "5px 0", borderRadius: "var(--r-sm)", fontSize: 9,
+                      fontFamily: "var(--font-mono)", fontWeight: 600, textAlign: "center",
+                      background: i < 5 ? "var(--sage-500)" : "var(--bg-sunken)",
+                      color: i < 5 ? "#fff" : "var(--fg-muted)",
+                    }}>{d}</div>
                   ))}
                 </div>
               </div>
-              {/* Shine overlay */}
-              <div className="absolute inset-0 pointer-events-none"
-                style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 50%)", borderRadius: "inherit" }} />
             </div>
-            <div className="absolute bottom-[-24px] left-[10%] right-[10%] h-[60px] blur-[20px] rounded-full"
-              style={{ background: "rgba(99,102,241,0.2)" }} />
           </div>
         </div>
       </section>
 
       {/* ── Features ── */}
-      <section className="py-24 bg-white" id="features" ref={featuresSectionRef}>
-        <div className="max-w-[1200px] mx-auto px-6 text-center">
-          <div className="lp-section-label inline-block px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.08em] text-[#6366f1] mb-4"
-            style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)" }}>
-            Everything You Need
+      <section id="features" ref={featuresSectionRef} style={{ padding: "80px 0", background: "var(--bg-raised)", borderTop: "1px solid var(--border-faint)" }}>
+        <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 24px" }}>
+          <div style={{ textAlign: "center", marginBottom: 56 }}>
+            <div className="eyebrow lp-section-label" style={{ marginBottom: 14 }}>What&apos;s inside</div>
+            <h2 className="lp-section-title" style={{ fontFamily: "var(--font-display)", fontWeight: 500, fontSize: "var(--text-4xl)", letterSpacing: "-0.025em", lineHeight: 1.08, margin: "0 0 16px", color: "var(--fg)" }}>
+              Everything in one calm surface.
+            </h2>
+            <p className="lp-section-sub" style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-md)", color: "var(--fg-muted)", maxWidth: 520, margin: "0 auto", lineHeight: 1.55 }}>
+              From daily prayer tracking to rich Q&amp;A notes — every tool you need to build better habits.
+            </p>
           </div>
-          <h2 className="lp-section-title text-[2.2rem] font-extrabold text-[#0f172a] m-0 mb-4 tracking-[-0.03em]">
-            Features built for consistency
-          </h2>
-          <p className="lp-section-sub text-[1rem] text-[#64748b] max-w-[500px] mx-auto mb-12 leading-[1.7]">
-            From daily prayer tracking to rich Q&amp;A notes — every tool you need to build better habits lives in one place.
-          </p>
-          <div className="grid grid-cols-3 gap-6 max-lg:grid-cols-2 max-sm:grid-cols-1">
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }}>
             {FEATURES.map((f, i) => (
               <div
                 key={f.title}
                 ref={el => (featureCardsRef.current[i] = el)}
-                className="p-6 rounded-2xl border border-[#f1f5f9] text-left transition-all duration-200 hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] hover:border-[#e0e7ff] hover:translate-y-[-4px]"
-                style={{ background: "linear-gradient(135deg, #f9fafb, #fff)" }}
+                style={{
+                  padding: "24px 8px 8px", borderRadius: 0,
+                  borderTop: "2px solid var(--border)",
+                }}
               >
-                <div className="text-3xl mb-4">{f.icon}</div>
-                <h3 className="text-base font-bold text-[#0f172a] m-0 mb-2">{f.title}</h3>
-                <p className="text-[0.875rem] text-[#64748b] m-0 leading-[1.6]">{f.desc}</p>
+                <h3 style={{
+                  fontFamily: "var(--font-display)", fontSize: "var(--text-xl)",
+                  fontWeight: 500, letterSpacing: "-0.01em",
+                  color: "var(--fg)", margin: "0 0 8px",
+                }}>{f.title}</h3>
+                <p style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)", color: "var(--fg-muted)", margin: 0, lineHeight: 1.55 }}>
+                  {f.desc}
+                </p>
               </div>
             ))}
           </div>
@@ -319,61 +309,81 @@ function LandingPage({ onGetStarted, onLogin }) {
       </section>
 
       {/* ── Pricing ── */}
-      <section className="py-24" id="pricing" ref={pricingSectionRef}
-        style={{ background: "linear-gradient(160deg, #f9fafb, #eef2ff 60%, #f0fdf4)" }}>
-        <div className="max-w-[1200px] mx-auto px-6 text-center">
-          <div className="lp-section-label inline-block px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-[0.08em] text-[#6366f1] mb-4"
-            style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)" }}>
-            Pricing
+      <section id="pricing" ref={pricingSectionRef} style={{ padding: "80px 0", background: "var(--bg)" }}>
+        <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 24px" }}>
+          <div style={{ textAlign: "center", marginBottom: 56 }}>
+            <div className="eyebrow lp-section-label" style={{ marginBottom: 14 }}>Pricing</div>
+            <h2 className="lp-section-title" style={{ fontFamily: "var(--font-display)", fontWeight: 500, fontSize: "var(--text-3xl)", letterSpacing: "-0.025em", margin: "0 0 14px", color: "var(--fg)" }}>
+              Simple, honest pricing.
+            </h2>
+            <p className="lp-section-sub" style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-md)", color: "var(--fg-muted)", margin: 0, lineHeight: 1.55 }}>
+              Start free. Upgrade when you need more than one month of history.
+            </p>
           </div>
-          <h2 className="lp-section-title text-[2.2rem] font-extrabold text-[#0f172a] m-0 mb-4 tracking-[-0.03em]">
-            Simple, honest pricing
-          </h2>
-          <p className="lp-section-sub text-[1rem] text-[#64748b] mb-12 leading-[1.7]">
-            Start free, upgrade when you&apos;re ready. Cancel anytime.
-          </p>
-          <div className="grid grid-cols-3 gap-6 max-lg:grid-cols-1 max-w-[900px] mx-auto">
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20, maxWidth: 900, margin: "0 auto" }}>
             {PLANS.map((plan, i) => (
               <div
                 key={plan.name}
                 ref={el => (pricingCardsRef.current[i] = el)}
-                className={`relative p-8 rounded-2xl text-left flex flex-col ${
-                  plan.badge
-                    ? "border-2 border-[#6366f1] shadow-[0_20px_60px_rgba(99,102,241,0.2)]"
-                    : "border border-[#e2e8f0] bg-white"
-                }`}
-                style={plan.badge ? { background: "linear-gradient(135deg, #f0f0ff, #fff)" } : {}}
+                style={{
+                  position: "relative",
+                  background: "var(--bg-raised)",
+                  border: `1px solid ${plan.badge ? "var(--accent)" : "var(--border)"}`,
+                  borderRadius: "var(--r-lg)",
+                  padding: 28,
+                  display: "flex",
+                  flexDirection: "column",
+                  boxShadow: plan.badge ? "var(--shadow-md)" : "var(--shadow-sm)",
+                }}
               >
                 {plan.badge && (
-                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold text-white whitespace-nowrap"
-                    style={{ background: "linear-gradient(135deg, #6366f1, #4f46e5)" }}>
+                  <div style={{
+                    position: "absolute", top: -11, right: 20,
+                    background: "var(--accent)", color: "#fff",
+                    fontSize: "var(--text-xs)", letterSpacing: "0.06em", textTransform: "uppercase",
+                    padding: "3px 10px", borderRadius: "var(--r-full)", fontWeight: 500,
+                    fontFamily: "var(--font-sans)",
+                  }}>
                     {plan.badge}
                   </div>
                 )}
-                <div className="text-lg font-bold text-[#0f172a] mb-2">{plan.name}</div>
-                <div className="flex items-baseline gap-1 mb-6">
-                  <span className="text-[2.5rem] font-extrabold text-[#0f172a] tracking-[-0.03em]">{plan.price}</span>
-                  <span className="text-sm text-[#64748b]">/{plan.period}</span>
+                <div style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-lg)", fontWeight: 500, marginBottom: 10, color: "var(--fg)" }}>
+                  {plan.name}
                 </div>
-                <ul className="list-none m-0 p-0 flex flex-col gap-3 flex-1 mb-8">
+                <div style={{ marginBottom: 4 }}>
+                  <span className="num" style={{ fontSize: "var(--text-4xl)", fontWeight: 600, color: "var(--fg)" }}>{plan.price}</span>
+                </div>
+                <div style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)", color: "var(--fg-muted)", marginBottom: 20 }}>
+                  {plan.period}
+                </div>
+                <ul style={{ listStyle: "none", padding: 0, margin: "0 0 24px", display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
                   {plan.features.map(feat => (
-                    <li key={feat} className="flex items-center gap-2 text-[0.875rem] text-[#334155]">
-                      <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[0.65rem] font-bold text-[#6366f1]"
-                        style={{ background: "rgba(99,102,241,0.1)" }}>
-                        ✓
-                      </span>
+                    <li key={feat} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)", color: "var(--fg)" }}>
+                      <svg viewBox="0 0 16 16" width="14" height="14" style={{ flexShrink: 0, marginTop: 2, color: "var(--accent)" }} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 8l3.5 3.5L13 4"/>
+                      </svg>
                       {feat}
                     </li>
                   ))}
                 </ul>
                 <button
-                  className={`w-full py-3 rounded-[10px] text-[0.9rem] font-bold cursor-pointer transition-all duration-200 hover:opacity-90 hover:translate-y-[-1px] border-none ${
-                    plan.ctaStyle === "solid"
-                      ? "text-white"
-                      : "text-[#6366f1] border border-[#6366f1] bg-transparent hover:bg-[#eef2ff]"
-                  }`}
-                  style={plan.ctaStyle === "solid" ? { background: "linear-gradient(135deg, #6366f1, #4f46e5)" } : {}}
                   onClick={onGetStarted}
+                  style={{
+                    width: "100%",
+                    padding: "10px 0",
+                    borderRadius: "var(--r-md)",
+                    fontFamily: "var(--font-sans)",
+                    fontSize: "var(--text-sm)",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    transition: "background var(--dur-fast) var(--ease), border-color var(--dur-fast)",
+                    background: plan.ctaStyle === "solid" ? "var(--accent)" : "transparent",
+                    color: plan.ctaStyle === "solid" ? "#fff" : "var(--accent)",
+                    border: `1px solid ${plan.ctaStyle === "solid" ? "var(--accent)" : "var(--accent)"}`,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = plan.ctaStyle === "solid" ? "var(--accent-hover)" : "var(--accent-weak)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = plan.ctaStyle === "solid" ? "var(--accent)" : "transparent"; }}
                 >
                   {plan.cta}
                 </button>
@@ -384,14 +394,18 @@ function LandingPage({ onGetStarted, onLogin }) {
       </section>
 
       {/* ── Footer ── */}
-      <footer className="py-12 border-t border-[#f1f5f9] bg-white">
-        <div className="max-w-[1200px] mx-auto px-6 text-center">
-          <span className="flex items-center justify-center gap-2 text-[1.2rem] font-extrabold text-[#0f172a] tracking-[-0.02em] mb-3">
-            <span className="text-[1.4rem]">📊</span>
-            Activity Tracker
+      <footer style={{ padding: "40px 0", borderTop: "1px solid var(--border-faint)", textAlign: "center" }}>
+        <div style={{ maxWidth: 1180, margin: "0 auto", padding: "0 24px" }}>
+          <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
+            <img src="/rhythm-logo.svg" alt="Rhythm" width={20} height={20} style={{ borderRadius: 4 }} />
+            <span style={{ fontFamily: "var(--font-display)", fontWeight: 500, fontSize: 16, letterSpacing: "-0.02em", color: "var(--fg)" }}>Rhythm</span>
           </span>
-          <p className="text-[0.9rem] text-[#64748b] m-0 mb-1">Build better habits, one day at a time.</p>
-          <p className="text-xs text-[#94a3b8] m-0">© 2026 Activity Tracker. All rights reserved.</p>
+          <p style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)", color: "var(--fg-muted)", margin: 0 }}>
+            A quieter way to keep your days.
+          </p>
+          <p style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-xs)", color: "var(--fg-faint)", margin: "6px 0 0" }}>
+            © 2026 Rhythm. All rights reserved.
+          </p>
         </div>
       </footer>
     </div>

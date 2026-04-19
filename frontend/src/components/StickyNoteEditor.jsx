@@ -36,7 +36,7 @@ const btnBase =
 const btnActive = "bg-black/[0.14] !border-black/20 text-primary";
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function StickyNoteEditor({ value, onChange, noteId }) {
+export default function StickyNoteEditor({ value, onChange, noteId, defaultEditorHeight = 90 }) {
   const divRef     = useRef(null);
   const editingRef = useRef(false);
   const dragState  = useRef(null);   // { startY, startH }
@@ -44,12 +44,18 @@ export default function StickyNoteEditor({ value, onChange, noteId }) {
   const [toolbarOpen, setToolbarOpen]     = useState(false);
   const [editorH, setEditorH] = useState(() => {
     const saved = localStorage.getItem(`sne-h-${noteId}`);
-    return saved ? parseInt(saved, 10) : 90;
+    if (saved) return parseInt(saved, 10);
+    return defaultEditorHeight;
   });
 
   useEffect(() => {
     if (divRef.current) divRef.current.innerHTML = value || "";
   }, [noteId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const saved = localStorage.getItem(`sne-h-${noteId}`);
+    setEditorH(saved ? parseInt(saved, 10) : defaultEditorHeight);
+  }, [noteId, defaultEditorHeight]);
 
   const refreshActiveFormats = () => {
     setActiveFormats({

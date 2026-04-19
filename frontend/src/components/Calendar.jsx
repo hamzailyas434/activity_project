@@ -245,7 +245,7 @@ function Calendar({
   return (
     <>
       <div className="calendar-wrapper fade-in">
-        <div ref={scrollContainerRef} style={{ overflowX: "auto" }}>
+        <div ref={scrollContainerRef} className="calendar-scroll">
           <table className="calendar-table">
             <thead>
               <tr>
@@ -296,9 +296,9 @@ function Calendar({
                     style={dragOverActivityId === activity.id ? { borderRight: "3px solid var(--primary-color)" } : undefined}
                     title="Drag to reorder"
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                      <span className="cal-drag-handle">⋮⋮</span>
-                      {activity.name}
+                    <div className="routine-cell-inner">
+                      <span className="cal-drag-handle" aria-hidden>⋮⋮</span>
+                      <span className="routine-cell-name">{activity.name}</span>
                       {activity.type !== "checkbox" && (
                         <span className="header-type-badge">
                           {activity.type === "number" ? "#" : "T"}

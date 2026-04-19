@@ -1,6 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import ActivityManager from "./components/ActivityManager";
-import Calendar from "./components/Calendar";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import AuthPage from "./components/auth/AuthPage";
 import Notes from "./components/Notes";
 import QazaNamaz from "./components/QazaNamaz";
@@ -10,20 +8,30 @@ import FavouriteProfiles from "./components/FavouriteProfiles";
 import ProfileDropdown from "./components/ProfileDropdown";
 import { useAuth } from "./contexts/AuthContext";
 import LandingPage from "./components/LandingPage";
-import MonthlyTodos from "./components/MonthlyTodos";
-import StickyNoteEditor from "./components/StickyNoteEditor";
 import Books from "./components/Books";
-import BookNoteWidget from "./components/BookNoteWidget";
+import DashboardHome from "./components/DashboardHome";
+import ActivitiesPage from "./components/ActivitiesPage";
+import { Icon } from "./components/rhythm/RhythmAtoms";
 
 import { apiFetch, API_BASE_URL } from "./utils/apiFetch";
 
-// ── Shared class snippets ──────────────────────────────────────────────────────
-const tabBtn = (active) =>
-  `px-[1.1rem] py-[0.6rem] rounded-lg border-none cursor-pointer text-[0.85rem] whitespace-nowrap transition-all duration-200 ${
-    active
-      ? "bg-primary text-white font-semibold"
-      : "bg-transparent text-ink-sub font-medium hover:bg-gtint-hov"
-  }`;
+const QAZA_NAMES = ["Fajr", "Zuhr", "Asr", "Maghrib", "Isha"];
+
+function computeQazaTotal(payload) {
+  if (!payload) return null;
+  let t = 0;
+  for (const n of QAZA_NAMES) {
+    const years = parseFloat(payload[n]) || 0;
+    const adj = payload.adjustments?.[n] || 0;
+    t += years * 365 + adj;
+  }
+  return Math.max(0, Math.round(t));
+}
+
+function formatMoney(n) {
+  if (n == null || Number.isNaN(n)) return "";
+  return Number(n).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+}
 
 function App() {
   const { user, token, login, logout, refreshTokens, isAuthenticated, loading: authLoading } = useAuth();
@@ -43,18 +51,10 @@ function App() {
   const STICKY_COLORS = ["#fef08a","#86efac","#93c5fd","#f9a8d4","#c4b5fd","#fdba74","#ffffff"];
   const [stickyNotes, setStickyNotes] = useState([]);
   const [booksSummary, setBooksSummary] = useState(null);
+  const [qazaPayload, setQazaPayload] = useState(null);
+  const [favouriteBookNotes, setFavouriteBookNotes] = useState([]);
+  const [expenseRows, setExpenseRows] = useState([]);
   const stickyDebounceRef = useRef({});
-  const carouselRef  = useRef(null);
-  const [carouselIdx, setCarouselIdx] = useState(0);
-
-  const scrollCarousel = useCallback((dir) => {
-    const el = carouselRef.current;
-    if (!el) return;
-    const panelW = el.offsetWidth;
-    const next = Math.max(0, Math.min(2, carouselIdx + dir));
-    el.scrollTo({ left: next * panelW, behavior: "smooth" });
-    setCarouselIdx(next);
-  }, [carouselIdx]);
 
   useEffect(() => {
     if (!token) return;
@@ -72,6 +72,22 @@ function App() {
       .catch(err => console.error("Failed to load sticky notes:", err));
   }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!token) return;
+    apiFetch(`${API_BASE_URL}/qaza-namaz`, {}, { token, refreshTokens, logout })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => data && setQazaPayload(data))
+      .catch(() => setQazaPayload(null));
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!token || activeTab !== "dashboard") return;
+    apiFetch(`${API_BASE_URL}/books/favourite-notes`, {}, { token, refreshTokens, logout })
+      .then(r => (r.ok ? r.json() : []))
+      .then(data => Array.isArray(data) && setFavouriteBookNotes(data))
+      .catch(() => setFavouriteBookNotes([]));
+  }, [token, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleAddStickyNote = async () => {
     const color = STICKY_COLORS[stickyNotes.length % STICKY_COLORS.length];
     try {
@@ -81,7 +97,11 @@ function App() {
       });
       const newNote = await res.json();
       setStickyNotes(prev => [...prev, newNote]);
-    } catch (err) { console.error("Failed to add sticky note:", err); }
+      return newNote;
+    } catch (err) {
+      console.error("Failed to add sticky note:", err);
+      return null;
+    }
   };
 
   const handleStickyNoteChange = (id, text) => {
@@ -133,6 +153,14 @@ function App() {
 
   const currentYear  = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
+
+  useEffect(() => {
+    if (!token) return;
+    apiFetch(`${API_BASE_URL}/expenses?month=${currentMonth}&year=${currentYear}`, {}, { token, refreshTokens, logout })
+      .then(r => (r.ok ? r.json() : []))
+      .then(data => Array.isArray(data) && setExpenseRows(data))
+      .catch(() => setExpenseRows([]));
+  }, [token, currentMonth, currentYear]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (isAuthenticated && token) fetchData();
@@ -296,13 +324,141 @@ function App() {
     } catch (err) { console.error("Error saving note:", err); setError("Failed to save note"); }
   };
 
-  const monthName = currentDate.toLocaleString("default", { month: "long", year: "numeric" });
+  const getCompletionData = useCallback(
+    (activityId, day) => {
+      const key = completionKey(day, activityId);
+      const data = completions[key];
+      if (typeof data === "object" && data !== null) {
+        let notes = [];
+        if (data.note) {
+          try {
+            notes = typeof data.note === "string" ? JSON.parse(data.note) : data.note;
+            if (!Array.isArray(notes)) notes = data.note.trim() ? [data.note] : [];
+          } catch {
+            notes = data.note.trim() ? [data.note] : [];
+          }
+        }
+        return { ...data, notes };
+      }
+      return {
+        isCompleted: data === 1 || data === true,
+        note: "",
+        notes: [],
+        value: "",
+        completionColor: "",
+      };
+    },
+    [completions]
+  );
+
+  const monthLabel = currentDate.toLocaleString("default", { month: "long" });
+  const yearLabel  = currentDate.getFullYear();
+
+  const qazaTotals = useMemo(() => {
+    const total = computeQazaTotal(qazaPayload);
+    return { total };
+  }, [qazaPayload]);
+
+  const expenseDashboard = useMemo(() => {
+    const list = expenseRows || [];
+    const total = list.reduce((s, e) => s + Number(e.amount || 0), 0);
+    const byCat = {};
+    for (const e of list) {
+      const c = e.category || "other";
+      byCat[c] = (byCat[c] || 0) + Number(e.amount || 0);
+    }
+    const labels = { home_bills: "Bills", home_person: "Family", other: "Other" };
+    const bars = Object.entries(byCat)
+      .map(([k, amt]) => ({
+        cat: labels[k] || k,
+        amt: formatMoney(amt),
+        pct: total > 0 ? Math.round((amt / total) * 100) : 0,
+      }))
+      .sort((a, b) => b.pct - a.pct)
+      .slice(0, 5);
+    return { total, totalFmt: formatMoney(total), bars };
+  }, [expenseRows]);
+
+  const greetParts = useMemo(() => {
+    const todayDate = new Date();
+    const h = todayDate.getHours();
+    const g = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+    const raw = user?.name || user?.username || "there";
+    const name = String(raw).split(" ")[0];
+    return {
+      greeting: `${g}, ${name}.`,
+      dateLine: todayDate.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }),
+      weekday: todayDate.toLocaleDateString(undefined, { weekday: "long" }),
+    };
+  }, [user]);
+
+  const monthNav = useMemo(
+    () => ({
+      label: `${monthLabel} ${yearLabel}`,
+      onPrev: handlePreviousMonth,
+      onNext: handleNextMonth,
+    }),
+    [monthLabel, yearLabel, handlePreviousMonth, handleNextMonth]
+  );
+
+  const todayDayForDash = useMemo(() => {
+    const todayDate = new Date();
+    const ok = todayDate.getMonth() + 1 === currentMonth && todayDate.getFullYear() === currentYear;
+    return ok ? todayDate.getDate() : null;
+  }, [currentMonth, currentYear]);
+
+  const activitySummaryStats = useMemo(() => {
+    const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+    let daysWith = 0;
+    for (let d = 1; d <= daysInMonth; d++) {
+      let any = false;
+      for (const a of activities) {
+        const k = `${d}-${a.id}`;
+        const c = completions[k];
+        const done = typeof c === "object" && c !== null ? c.isCompleted : c === 1 || c === true;
+        if (done) {
+          any = true;
+          break;
+        }
+      }
+      if (any) daysWith++;
+    }
+    let doneCells = 0;
+    const totalCells = daysInMonth * Math.max(1, activities.length);
+    for (let d = 1; d <= daysInMonth; d++) {
+      for (const a of activities) {
+        const k = `${d}-${a.id}`;
+        const c = completions[k];
+        const done = typeof c === "object" && c !== null ? c.isCompleted : c === 1 || c === true;
+        if (done) doneCells++;
+      }
+    }
+    const avg = totalCells > 0 ? Math.round((doneCells / totalCells) * 100) : 0;
+    return [
+      ["Days with activity", `${daysWith} / ${daysInMonth}`],
+      ["Routine rows", String(activities.length)],
+      ["Completion avg (month)", `${avg}%`],
+      ["Qaza (est.)", qazaTotals.total != null ? String(qazaTotals.total) : "—"],
+      ["Expenses total", expenseDashboard.totalFmt || "—"],
+    ];
+  }, [activities, completions, currentYear, currentMonth, qazaTotals.total, expenseDashboard.totalFmt]);
+
   const handleAuthSuccess = (userData, authToken, remember) => login(userData, authToken, remember);
+
+  const tabs = [
+    { id: "dashboard",  label: "Dashboard" },
+    { id: "notes",      label: "Notes" },
+    { id: "qaza-namaz", label: "Qaza" },
+    { id: "activities", label: "Activities" },
+    { id: "expenses",   label: "Expenses" },
+    { id: "favourites", label: "Favourites" },
+    { id: "books",      label: "Books" },
+  ];
 
   if (authLoading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="w-10 h-10 border-4 border-edge border-t-primary rounded-full animate-spin-slow" />
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "var(--bg)" }}>
+        <div style={{ width: 32, height: 32, borderRadius: "50%", border: "2px solid var(--border-strong)", borderTopColor: "var(--accent)", animation: "spin 0.8s linear infinite" }} />
       </div>
     );
   }
@@ -327,373 +483,125 @@ function App() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="w-10 h-10 border-4 border-edge border-t-primary rounded-full animate-spin-slow" />
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "var(--bg)" }}>
+        <div style={{ width: 32, height: 32, borderRadius: "50%", border: "2px solid var(--border-strong)", borderTopColor: "var(--accent)", animation: "spin 0.8s linear infinite" }} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen">
-      {/* ── Header ── */}
-      <header className="header-glass sticky top-0 z-[100] border-b border-edge shadow-glass py-4">
-        <div className="max-w-[1400px] mx-auto px-8 flex justify-between items-center flex-wrap gap-4 max-sm:px-4 max-sm:justify-center max-sm:flex-col max-sm:gap-2">
-          <h1 className="gradient-text text-2xl font-bold tracking-tight">
-            Activity Tracker
-          </h1>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-4">
+    <div className="rhythm-kit" style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--fg)" }}>
+      <header className="topbar">
+        <div className="topbar-inner">
+          <div className="brand">
+            <img src="/rhythm-logo.svg" alt="" width={28} height={28} style={{ borderRadius: 6 }} />
+            <span className="brand-name">Rhythm</span>
+          </div>
+          <nav className="tabs" aria-label="Main">
+            {tabs.map(({ id, label }) => (
               <button
-                className="bg-surface border border-edge text-ink px-4 py-2 rounded-lg cursor-pointer text-[0.9rem] transition-all duration-200 hover:bg-gtint-hov hover:border-primary"
-                onClick={handlePreviousMonth}
-                aria-label="Previous month"
+                key={id}
+                type="button"
+                className={`tab${activeTab === id ? " active" : ""}`}
+                onClick={() => setActiveTab(id)}
               >
-                ◀ Previous
+                {label}
               </button>
-              <span className="font-semibold min-w-[150px] text-center text-ink">{monthName}</span>
-              <button
-                className="bg-surface border border-edge text-ink px-4 py-2 rounded-lg cursor-pointer text-[0.9rem] transition-all duration-200 hover:bg-gtint-hov hover:border-primary"
-                onClick={handleNextMonth}
-                aria-label="Next month"
-              >
-                Next ▶
-              </button>
-            </div>
+            ))}
+          </nav>
+          <div className="topbar-right">
+            <button type="button" className="icon-btn" title="Export CSV" aria-label="Export" onClick={handleExportData}>
+              <Icon name="export" size={16} />
+            </button>
             <button
-              className="bg-surface border border-edge rounded-full w-10 h-10 flex items-center justify-center cursor-pointer text-xl transition-all duration-200 hover:bg-gtint-hov hover:scale-110"
-              onClick={toggleTheme}
+              type="button"
+              className="icon-btn icon-btn--theme"
               title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+              aria-label="Theme"
+              onClick={toggleTheme}
             >
-              {theme === "dark" ? "☀️" : "🌙"}
+              {theme === "dark" ? <Icon name="sun" size={16} /> : <Icon name="moon" size={16} />}
             </button>
             <ProfileDropdown user={user} onLogout={logout} onNavigateToProfile={() => setActiveTab("profile")} />
           </div>
         </div>
       </header>
 
-      <div className="max-w-[1400px] mx-auto p-8 max-sm:p-4">
+      <main className="app-main">
         {error && (
-          <div className="bg-danger text-white p-4 rounded-lg mb-4 text-center">{error}</div>
-        )}
-
-        {/* ── Tab Navigation ── */}
-        <div className="flex gap-2 mb-6 bg-surface px-2 py-2 rounded-xl border border-edge shadow-glass overflow-x-auto whitespace-nowrap mb-6">
-          {[
-            { id: "dashboard", label: "📊 Dashboard" },
-            { id: "notes",     label: "📝 Notes" },
-            { id: "qaza-namaz",label: "🕌 Qaza Namaz" },
-            { id: "activities",label: "⚙️ Activities" },
-            { id: "profile",   label: "👤 Profile" },
-            { id: "expenses",  label: "💰 Expenses" },
-            { id: "favourites",label: "⭐ Favourites" },
-            { id: "books",     label: "📚 Books" },
-          ].map(({ id, label }) => (
-            <button key={id} className={tabBtn(activeTab === id)} onClick={() => setActiveTab(id)}>
-              {label}
-            </button>
-          ))}
-          <button
-            className="ml-auto px-[1.1rem] py-[0.6rem] rounded-lg border-none cursor-pointer text-[0.85rem] font-medium whitespace-nowrap transition-all duration-200 bg-transparent text-ink-sub hover:bg-gtint-hov"
-            onClick={handleExportData}
+          <div
+            style={{
+              background: "var(--danger-weak)",
+              color: "var(--danger)",
+              padding: "12px 16px",
+              borderRadius: "var(--r-md)",
+              marginBottom: 20,
+              fontSize: 13,
+              fontFamily: "var(--font-sans)",
+              border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)",
+            }}
           >
-            💾 Export
-          </button>
-        </div>
-
-        {/* ── Dashboard Tab ── */}
-        {activeTab === "dashboard" && (
-          <>
-            {/* Top 3-panel horizontal carousel */}
-            <div className="relative mb-6 animate-fade-in">
-              {/* Left arrow */}
-              {carouselIdx > 0 && (
-                <button
-                  onClick={() => scrollCarousel(-1)}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 z-10 w-7 h-7 rounded-full bg-surface border border-edge shadow-glass flex items-center justify-center text-ink-sub text-base cursor-pointer hover:bg-gtint-hov transition-colors"
-                  title="Previous"
-                >‹</button>
-              )}
-              {/* Right arrow */}
-              {carouselIdx < 2 && (
-                <button
-                  onClick={() => scrollCarousel(1)}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-3 z-10 w-7 h-7 rounded-full bg-surface border border-edge shadow-glass flex items-center justify-center text-ink-sub text-base cursor-pointer hover:bg-gtint-hov transition-colors"
-                  title="Next"
-                >›</button>
-              )}
-
-              {/* Scroll track */}
-              <div
-                ref={carouselRef}
-                className="flex overflow-x-hidden gap-5"
-                style={{ scrollSnapType: "x mandatory" }}
-              >
-                {/* Panel 1 — Progress + Goals */}
-                <div className="shrink-0 w-full" style={{ scrollSnapAlign: "start" }}>
-                  <div className="grid grid-cols-[1fr_1.2fr] gap-5 items-stretch max-md:grid-cols-1">
-                    {/* Left: Progress Banner */}
-                    <div className="flex flex-col justify-center">
-                      {summary?.daily && (() => {
-                        const { percentage, completed, total } = summary.daily;
-                        const color = percentage >= 80
-                          ? "var(--success)" : percentage >= 40 ? "var(--warning)" : "var(--danger-color)";
-                        return (
-                          <div className="glass rounded-xl px-6 py-4 h-full box-border">
-                            <div className="flex items-baseline justify-between mb-[0.6rem]">
-                              <div className="flex items-baseline gap-1 text-[0.9rem] text-ink-muted">
-                                <span className="text-2xl font-bold text-ink leading-none">{completed}</span>
-                                <span className="text-base text-ink-muted">/</span>
-                                <span className="text-base font-semibold text-ink-sub">{total}</span>
-                                <span className="text-[0.85rem] ml-1">activities done today</span>
-                              </div>
-                              <span className="text-[1.75rem] font-extrabold tracking-[-0.03em] leading-none" style={{ color }}>
-                                {percentage}%
-                              </span>
-                            </div>
-                            <div className="h-[6px] rounded-full bg-gtint-hov overflow-hidden">
-                              <div
-                                className="progress-fill"
-                                style={{ width: `${percentage}%`, background: color }}
-                              />
-                            </div>
-                            <MonthlyTodos
-                              month={currentMonth}
-                              year={currentYear}
-                              authHeaders={() => ({ Authorization: `Bearer ${token}` })}
-                            />
-                          </div>
-                        );
-                      })()}
-                    </div>
-                    {/* Right: Sticky Notes */}
-                    <div className="glass rounded-xl flex flex-col overflow-hidden min-h-[100px]">
-                      <div className="flex items-center justify-between px-4 py-[0.65rem] border-b border-edge">
-                        <span className="text-[0.85rem] font-semibold text-ink-sub tracking-[0.02em]">
-                          📌 Quick Notes
-                        </span>
-                        <button
-                          className="w-[26px] h-[26px] border-none bg-primary text-white rounded-full text-lg leading-none cursor-pointer flex items-center justify-center transition-opacity duration-150 hover:opacity-85"
-                          onClick={handleAddStickyNote}
-                          title="Add note"
-                        >
-                          +
-                        </button>
-                      </div>
-                      <div className={`grid ${stickyNotes.length === 1 ? "grid-cols-1" : "grid-cols-2"} gap-3 p-3 overflow-y-auto`}>
-                        {stickyNotes.length === 0 && (
-                          <p className="text-[0.8rem] text-ink-muted text-center col-span-2 py-2">
-                            No notes yet. Click + to add one.
-                          </p>
-                        )}
-                        {stickyNotes.map(note => (
-                          <div
-                            key={note.id}
-                            className="rounded-lg px-[0.6rem] py-[0.5rem] flex flex-col gap-[0.4rem] shadow-[0_2px_6px_rgba(0,0,0,0.15)]"
-                            style={{ background: note.color }}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex gap-1">
-                                {STICKY_COLORS.map(c => (
-                                  <button
-                                    key={c}
-                                    className={`color-dot${note.color === c ? " active" : ""}`}
-                                    style={{ background: c }}
-                                    onClick={() => handleStickyNoteColor(note.id, c)}
-                                    title={c}
-                                  />
-                                ))}
-                              </div>
-                              <button
-                                className="bg-transparent border-none text-black/35 text-[0.75rem] cursor-pointer px-0.5 leading-none transition-colors duration-150 hover:text-black/70"
-                                onClick={() => handleDeleteStickyNote(note.id)}
-                                title="Delete note"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                            <StickyNoteEditor
-                              key={note.id}
-                              noteId={note.id}
-                              value={note.text}
-                              onChange={val => handleStickyNoteChange(note.id, val)}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Panel 2 — Book Notes Widget */}
-                <div className="shrink-0 w-full" style={{ scrollSnapAlign: "start" }}>
-                  <BookNoteWidget
-                    token={token}
-                    onOpenBook={(bookId, page) => {
-                      localStorage.setItem("pending-open-book", JSON.stringify({ bookId, page }));
-                      setActiveTab("books");
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Dot indicators */}
-              <div className="flex justify-center gap-2 mt-3">
-                {[0, 1].map(i => (
-                  <button
-                    key={i}
-                    onClick={() => scrollCarousel(i - carouselIdx)}
-                    className={`w-2 h-2 rounded-full border-none cursor-pointer transition-all duration-200 p-0 ${
-                      carouselIdx === i ? "bg-primary w-5" : "bg-ink-muted/35 hover:bg-ink-muted/60"
-                    }`}
-                    title={i === 0 ? "Dashboard" : "Book Notes"}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Today's Tasks */}
-            {(() => {
-              const todayDate = new Date();
-              const isCurrentMonth = todayDate.getMonth() + 1 === currentMonth && todayDate.getFullYear() === currentYear;
-              const todayDay = isCurrentMonth ? todayDate.getDate() : null;
-              if (!todayDay || activities.length === 0) return null;
-
-              const getCompletionData = (activityId, day) => {
-                const key = completionKey(day, activityId);
-                const data = completions[key];
-                if (typeof data === "object" && data !== null) return data;
-                return { isCompleted: data === 1 || data === true, note: "", value: "" };
-              };
-
-              return (
-                <div className="today-accent-bar glass rounded-2xl px-6 py-5 mb-6 animate-fade-in">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-base text-ink flex items-center gap-[0.4rem] m-0 font-bold">
-                      <span>📅</span> Today&apos;s Tasks
-                    </h3>
-                    <span className="bg-primary text-white px-3 py-1 rounded-[20px] text-xs font-semibold">
-                      {todayDate.toLocaleDateString("default", { weekday: "short", day: "numeric", month: "short" })}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-2 max-sm:grid-cols-2">
-                    {activities.map(activity => {
-                      const { isCompleted, value } = getCompletionData(activity.id, todayDay);
-                      const isInput = activity.type === "number" || activity.type === "text";
-                      return (
-                        <div
-                          key={activity.id}
-                          className={`flex items-center gap-[0.6rem] px-[0.875rem] py-[0.6rem] rounded-lg border transition-all duration-150 select-none ${
-                            isCompleted
-                              ? "border-ok/35 bg-ok/[0.06] hover:border-ok/60"
-                              : "border-edge bg-canvas hover:border-primary hover:bg-gtint-hov"
-                          }`}
-                          onClick={() => { if (!isInput) handleToggleCompletion(activity.id, todayDay); }}
-                          style={{ cursor: isInput ? "default" : "pointer" }}
-                        >
-                          <div className="flex items-center justify-center shrink-0">
-                            {isInput ? (
-                              <input
-                                type={activity.type}
-                                className="w-16 px-[0.4rem] py-[0.2rem] text-[0.8rem] rounded-md border border-edge bg-surface text-ink"
-                                value={value || ""}
-                                onClick={e => e.stopPropagation()}
-                                onChange={e => handleValueChange(activity.id, todayDay, e.target.value)}
-                                placeholder="—"
-                              />
-                            ) : (
-                              <span className={`w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center text-0 shrink-0 transition-all duration-150 ${
-                                isCompleted
-                                  ? "bg-ok border-ok text-white text-[0.65rem] font-extrabold"
-                                  : "border-edge bg-transparent hover:border-primary"
-                              }`}>
-                                {isCompleted ? "✓" : ""}
-                              </span>
-                            )}
-                          </div>
-                          <span className={`text-[0.84rem] font-medium overflow-hidden text-ellipsis whitespace-nowrap flex-1 min-w-0 transition-colors duration-150 ${
-                            isCompleted ? "text-ink-muted line-through decoration-ok" : "text-ink"
-                          }`}>
-                            {activity.name}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Reading Progress Widget */}
-            {booksSummary && (
-              <div className="glass rounded-xl px-5 py-4 mb-6 flex items-center gap-5 animate-fade-in max-sm:flex-col max-sm:items-start">
-                <div className="text-2xl">📚</div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
-                    <span className="text-[0.85rem] font-semibold text-ink">
-                      {booksSummary.current_book
-                        ? <span className="text-ink-sub font-normal truncate">{booksSummary.current_book.title}</span>
-                        : <span className="text-ink-sub font-normal">No books yet</span>
-                      }
-                    </span>
-                    <span className="text-[0.8rem] text-ink-muted shrink-0">
-                      {booksSummary.pages_today} / {booksSummary.daily_pages_goal} pages today
-                    </span>
-                  </div>
-                  <div className="h-[5px] rounded-full bg-gtint-hov overflow-hidden">
-                    <div
-                      className="progress-fill"
-                      style={{
-                        width: `${Math.min(100, Math.round((booksSummary.pages_today / booksSummary.daily_pages_goal) * 100))}%`,
-                        background: "var(--primary-color)",
-                      }}
-                    />
-                  </div>
-                  {booksSummary.current_book && (
-                    <div className="text-[0.75rem] text-ink-muted mt-1">
-                      p.{booksSummary.current_book.current_page}{booksSummary.current_book.total_pages > 0 && ` / ${booksSummary.current_book.total_pages}`}
-                    </div>
-                  )}
-                </div>
-                <button
-                  className="px-3 py-1 rounded-lg text-[0.8rem] bg-primary text-white border-none cursor-pointer shrink-0 hover:opacity-85 transition-opacity"
-                  onClick={() => setActiveTab("books")}
-                >
-                  Open Books
-                </button>
-              </div>
-            )}
-
-            <Calendar
-              activities={activities}
-              completions={completions}
-              year={currentYear}
-              month={currentMonth}
-              onToggleCompletion={handleToggleCompletion}
-              onSaveNote={handleSaveNote}
-              onValueChange={handleValueChange}
-              onActivityReorder={handleActivityReorder}
-            />
-          </>
+            {error}
+          </div>
         )}
 
-        {activeTab === "books"      && <Books />}
-        {activeTab === "notes"      && <Notes />}
+        {activeTab === "dashboard" && (
+          <DashboardHome
+            monthLabel={monthLabel}
+            greetParts={greetParts}
+            monthNav={monthNav}
+            summary={summary}
+            activities={activities}
+            todayDay={todayDayForDash}
+            getCompletionData={getCompletionData}
+            onToggleToday={handleToggleCompletion}
+            onValueToday={handleValueChange}
+            stickyNotes={stickyNotes}
+            stickyColors={STICKY_COLORS}
+            onAddSticky={handleAddStickyNote}
+            onStickyChange={handleStickyNoteChange}
+            onStickyColor={handleStickyNoteColor}
+            onDeleteSticky={handleDeleteStickyNote}
+            booksSummary={booksSummary}
+            expenseBars={expenseDashboard.bars}
+            expenseTotalFormatted={expenseDashboard.totalFmt}
+            qazaRemaining={qazaTotals.total}
+            favouriteBookNotes={favouriteBookNotes}
+            onOpenBooks={() => setActiveTab("books")}
+            onOpenExpenses={() => setActiveTab("expenses")}
+            setActiveTab={setActiveTab}
+          />
+        )}
+
+        {activeTab === "books" && <Books />}
+        {activeTab === "notes" && <Notes />}
         {activeTab === "qaza-namaz" && <QazaNamaz />}
-        {activeTab === "profile"    && <Profile />}
-        {activeTab === "expenses"   && <Expenses year={currentYear} month={currentMonth} />}
+        {activeTab === "profile" && <Profile />}
+        {activeTab === "expenses" && <Expenses year={currentYear} month={currentMonth} />}
         {activeTab === "favourites" && <FavouriteProfiles />}
         {activeTab === "activities" && (
-          <ActivityManager
+          <ActivitiesPage
+            monthLabel={monthLabel}
+            yearLabel={yearLabel}
+            onPrevMonth={handlePreviousMonth}
+            onNextMonth={handleNextMonth}
+            currentYear={currentYear}
+            currentMonth={currentMonth}
             activities={activities}
-            year={currentYear}
-            month={currentMonth}
+            completions={completions}
+            onToggleCompletion={handleToggleCompletion}
+            onSaveNote={handleSaveNote}
+            onValueChange={handleValueChange}
+            onActivityReorder={handleActivityReorder}
             previousMonthHasRoutines={previousMonthHasRoutines}
             onImportPreviousMonth={handleImportPreviousMonth}
             onActivityAdded={handleActivityAdded}
             onActivityDeleted={handleActivityDeleted}
+            authHeaders={() => ({ Authorization: `Bearer ${token}` })}
+            summaryStats={activitySummaryStats}
           />
         )}
-      </div>
+      </main>
     </div>
   );
 }

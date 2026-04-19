@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" width="200" height="48">
+  <rect x="2" y="2" width="44" height="44" rx="12" fill="#4F46E5"></rect>
+  <path d="M9 27 Q14 16 19 27 T29 27 T39 27" stroke="#FAFAF9" stroke-width="3" stroke-linecap="round" fill="none"></path>
+  <circle cx="39" cy="27" r="2.2" fill="#FAFAF9"></circle>
+  <text x="58" y="32" font-family="Newsreader, Georgia, serif" font-size="26" font-weight="500" fill="currentColor" letter-spacing="-0.5">Rhythm</text>
+</svg>
