@@ -1,0 +1,26 @@
+{
+  "name": "activity-tracker",
+  "version": "1.0.0",
+  "description": "Full-stack activity tracker with React frontend and MySQL backend",
+  "main": "index.js",
+  "scripts": {
+    "setup": "./setup.sh",
+    "install-all": "cd backend && npm install && cd ../frontend && npm install",
+    "backend": "cd backend && npm start",
+    "frontend": "cd frontend && npm run dev",
+    "backend:dev": "cd backend && npm run dev"
+  },
+  "keywords": [
+    "activity-tracker",
+    "react",
+    "mysql",
+    "express",
+    "tracking"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "@masaajid/qibla": "^1.0.0"
+  }
+}
