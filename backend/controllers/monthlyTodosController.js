@@ -1,9 +1,9 @@
-const pool = require("../config/database");
+const db = require("../config/database");
 
 async function getAll(req, res) {
   try {
     const { month, year } = req.query;
-    const [rows] = await pool.query(
+    const [rows] = await db.query(
       `SELECT id, text, completed, sort_order
        FROM monthly_todos
        WHERE user_id = ? AND month = ? AND year = ?
@@ -22,7 +22,7 @@ async function create(req, res) {
     const { text, month, year, sort_order = 0 } = req.body;
     if (!text || !text.trim()) return res.status(400).json({ error: "Text is required" });
 
-    const [result] = await pool.query(
+    const [result] = await db.query(
       `INSERT INTO monthly_todos (user_id, month, year, text, completed, sort_order)
        VALUES (?, ?, ?, ?, 0, ?)`,
       [req.user.id, month, year, text.trim(), sort_order]
@@ -48,7 +48,7 @@ async function update(req, res) {
     if (!fields.length) return res.status(400).json({ error: "Nothing to update" });
 
     vals.push(req.user.id, id);
-    await pool.query(
+    await db.query(
       `UPDATE monthly_todos SET ${fields.join(", ")} WHERE user_id = ? AND id = ?`,
       vals
     );
@@ -62,7 +62,7 @@ async function update(req, res) {
 async function remove(req, res) {
   try {
     const { id } = req.params;
-    await pool.query(
+    await db.query(
       `DELETE FROM monthly_todos WHERE user_id = ? AND id = ?`,
       [req.user.id, id]
     );
@@ -79,7 +79,7 @@ async function reorder(req, res) {
     if (!Array.isArray(orderedIds)) return res.status(400).json({ error: "orderedIds required" });
     await Promise.all(
       orderedIds.map((id, index) =>
-        pool.query(
+        db.query(
           "UPDATE monthly_todos SET sort_order = ? WHERE id = ? AND user_id = ?",
           [index, id, req.user.id]
         )

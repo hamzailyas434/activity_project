@@ -1,5 +1,71 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback, Fragment } from "react";
 import DayDetailsModal from "./DayDetailsModal";
+import TrendSpark from "./TrendSpark";
+import { Icon } from "./rhythm/RhythmAtoms";
+
+const WEEK_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+/** Per-cell completion color from notes modal → CSS `--mx-user-completion` + `.mx-has-user-completion` for Rhythm overrides. */
+function userCompletionClassAndStyle(completionColor) {
+  const s =
+    completionColor != null && String(completionColor).trim()
+      ? String(completionColor).trim()
+      : "";
+  if (!s) return { extraClass: "", mxStyle: undefined };
+  return {
+    extraClass: " mx-has-user-completion",
+    mxStyle: { "--mx-user-completion": s },
+  };
+}
+
+function rowStatsFromCodes(codes, statsDayIdx) {
+  if (statsDayIdx < 0) {
+    return { done: 0, elig: 0, streak: 0, pct: 0 };
+  }
+  let done = 0;
+  let elig = 0;
+  for (let i = 0; i <= statsDayIdx; i++) {
+    const c = codes[i];
+    if (c === 3 || c === 4) continue;
+    elig++;
+    if (c === 1) done++;
+    else if (c === 2) done += 0.5;
+  }
+  let streak = 0;
+  for (let i = statsDayIdx; i >= 0; i--) {
+    const c = codes[i];
+    if (c === 1 || c === 2) streak++;
+    else if (c === 3) continue;
+    else break;
+  }
+  return { done, elig, streak, pct: elig ? done / elig : 0 };
+}
+
+function DailyBarFaithful({ v, isToday }) {
+  if (v == null) {
+    return <div className="mx-sum-cell future" />;
+  }
+  const pct = Math.max(0.08, v);
+  const good = v >= 0.7;
+  return (
+    <div className={`mx-sum-cell${good ? " good" : " low"}${isToday ? " today" : ""}`}>
+      <div className="mx-sum-fill" style={{ height: `${(pct * 100).toFixed(1)}%` }} />
+    </div>
+  );
+}
+
+function RhythmDailyCell({ v, isToday }) {
+  if (v == null) {
+    return <div className="mx-r-daily future" />;
+  }
+  const pct = Math.round(v * 100);
+  const tone = v >= 0.8 ? "high" : v >= 0.5 ? "mid" : "low";
+  return (
+    <div className={`mx-r-daily ${tone}${isToday ? " today" : ""}`}>
+      <span className="mx-r-daily-num num">{pct}</span>
+    </div>
+  );
+}
 
 // Helper component for Input Cells
 function CellInput({ type, value, onSave, placeholder }) {
@@ -51,7 +117,15 @@ function Calendar({
   const [selectedDayModal, setSelectedDayModal] = useState(null); // { day: number, date: string }
   const [draggedActivityId, setDraggedActivityId] = useState(null);
   const [dragOverActivityId, setDragOverActivityId] = useState(null);
-  const dialogRef = useRef(null);
+  /** paint drag for Classic / Rhythm (ref = reliable on mouseenter) */
+  const paintDragRef = useRef(null);
+  const [matrixVariant, setMatrixVariant] = useState(() => {
+    try {
+      return localStorage.getItem("actmx-variant") || "rhythm";
+    } catch {
+      return "rhythm";
+    }
+  });
   const scrollContainerRef = useRef(null);
   const todayHeaderRef = useRef(null);
 
@@ -87,6 +161,43 @@ function Calendar({
     }, 150);
     return () => clearTimeout(timer);
   }, [year, month, isCurrentMonth, todayDay]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("actmx-variant", matrixVariant);
+    } catch {
+      /* ignore */
+    }
+  }, [matrixVariant]);
+
+  const isFutureDay = useCallback(
+    day => {
+      const d = new Date(year, month - 1, day);
+      const now = new Date();
+      d.setHours(0, 0, 0, 0);
+      now.setHours(0, 0, 0, 0);
+      return d > now;
+    },
+    [year, month]
+  );
+
+  const statsDayIdx = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const first = new Date(year, month - 1, 1);
+    const last = new Date(year, month - 1, daysInMonth);
+    first.setHours(0, 0, 0, 0);
+    last.setHours(0, 0, 0, 0);
+    if (last < now) return daysInMonth - 1;
+    if (first > now) return -1;
+    return todayDay != null ? todayDay - 1 : 0;
+  }, [year, month, daysInMonth, todayDay]);
+
+  const todayColumnIdx =
+    isCurrentMonth && todayDay != null ? todayDay - 1 : -1;
+
+  const weekdayForDay = day =>
+    WEEK_SHORT[new Date(year, month - 1, day).getDay()];
 
   const handleCheckboxChange = useCallback(
     (activityId, day) => {
@@ -127,6 +238,67 @@ function Calendar({
     };
   };
 
+  const getCellCode = (activity, day) => {
+    if (isFutureDay(day)) return 4;
+    const data = getCompletionData(activity.id, day);
+    if (activity.type === "checkbox") {
+      return data.isCompleted ? 1 : 0;
+    }
+    const v = data.value;
+    const filled = v != null && String(v).trim() !== "";
+    return filled ? 1 : 0;
+  };
+
+  const daily = useMemo(() => {
+    return Array.from({ length: daysInMonth }, (_, i) => {
+      const day = i + 1;
+      if (isFutureDay(day)) return null;
+      let done = 0;
+      let total = 0;
+      activities.forEach(activity => {
+        const c = getCellCode(activity, day);
+        if (c === 3 || c === 4) return;
+        total++;
+        if (c === 1) done += 1;
+        else if (c === 2) done += 0.5;
+      });
+      return total ? done / total : 0;
+    });
+  }, [activities, daysInMonth, isFutureDay, completions, year, month]);
+
+  const trend = useMemo(() => {
+    return daily.map((_, i) => {
+      const w = daily.slice(Math.max(0, i - 6), i + 1).filter(v => v != null);
+      return w.length ? w.reduce((a, b) => a + b, 0) / w.length : null;
+    });
+  }, [daily]);
+
+  const monthAveragePct = useMemo(() => {
+    const vals = daily.filter(v => v != null);
+    if (!vals.length) return 0;
+    return Math.round(
+      (vals.reduce((a, b) => a + b, 0) / vals.length) * 100
+    );
+  }, [daily]);
+
+  const applyPaintIfNeeded = (activity, day) => {
+    const drag = paintDragRef.current;
+    if (!drag || activity.type !== "checkbox") return;
+    const v = getCellCode(activity, day);
+    if (v === 4) return;
+    const data = getCompletionData(activity.id, day);
+    const done = data.isCompleted;
+    if (drag.mode === "on" && !done) {
+      handleCheckboxChange(activity.id, day);
+    } else if (drag.mode === "off" && done) {
+      handleCheckboxChange(activity.id, day);
+    }
+  };
+
+  const endPaintDrag = () => {
+    paintDragRef.current = null;
+  };
+
   const handleDoubleClick = (activityId, day) => {
     const data = getCompletionData(activityId, day);
     setEditingNote({ activityId, day });
@@ -139,9 +311,6 @@ function Calendar({
         ? [data.note]
         : [""];
     setNotesList(notes);
-    if (dialogRef.current) {
-      dialogRef.current.showModal();
-    }
   };
 
   const handleDayClick = day => {
@@ -161,14 +330,28 @@ function Calendar({
     }
   };
 
-  const handleCloseDialog = () => {
-    if (dialogRef.current) {
-      dialogRef.current.close();
-    }
+  const handleCloseDialog = useCallback(() => {
     setEditingNote(null);
     setNotesList([]);
     setNoteAccentColor("");
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!editingNote) return;
+    const onKey = e => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        handleCloseDialog();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [editingNote, handleCloseDialog]);
 
   const handleAddNoteRow = () => {
     setNotesList([...notesList, ""]);
@@ -187,7 +370,6 @@ function Calendar({
 
   // Drag and Drop Handlers
   const handleDragStart = (e, id) => {
-    console.log("Drag started", id);
     setDraggedActivityId(id);
     // Required for Firefox
     e.dataTransfer.setData("text/plain", id.toString());
@@ -197,7 +379,6 @@ function Calendar({
   };
 
   const handleDragEnd = e => {
-    console.log("Drag ended");
     e.currentTarget.style.opacity = "1";
     setDraggedActivityId(null);
     setDragOverActivityId(null);
@@ -210,14 +391,11 @@ function Calendar({
   };
 
   const handleDrop = (e, targetId) => {
-    console.log("Dropped on", targetId);
     e.preventDefault();
 
     if (draggedActivityId && draggedActivityId !== targetId) {
       const sourceIndex = activities.findIndex(a => a.id === draggedActivityId);
       const targetIndex = activities.findIndex(a => a.id === targetId);
-
-      console.log("Reordering from", sourceIndex, "to", targetIndex);
 
       if (sourceIndex !== -1 && targetIndex !== -1) {
         const newActivities = [...activities];
@@ -242,334 +420,586 @@ function Calendar({
     );
   }
 
+  const daysSpan = Math.max(1, daysInMonth - 1);
+
   return (
     <>
-      <div className="calendar-wrapper fade-in">
-        <div ref={scrollContainerRef} className="calendar-scroll">
-          <table className="calendar-table">
-            <thead>
-              <tr>
-                <th className="routine-header" style={{ zIndex: 60 }}>
-                  Routine
-                </th>
+      <div className="calendar-matrix-root fade-in">
+        <div className="calendar-matrix-toolbar">
+          <div className="acts-variant-switch" role="tablist" aria-label="Calendar layout">
+            {[
+              { key: "faithful", label: "Classic" },
+              { key: "rhythm", label: "Rhythm" },
+              { key: "dots", label: "Dots" },
+            ].map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={matrixVariant === key}
+                className={`actsv-btn${matrixVariant === key ? " on" : ""}`}
+                onClick={() => setMatrixVariant(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {matrixVariant === "faithful" && (
+          <div className="mx-wrap mx-faithful">
+            <div
+              ref={scrollContainerRef}
+              className="mx-scroll"
+              onMouseLeave={endPaintDrag}
+            >
+              <div
+                className="mx-grid"
+                style={{
+                  gridTemplateColumns: `220px repeat(${daysInMonth}, 36px)`,
+                }}
+              >
+                <div className="mx-head-routine">Routine</div>
                 {days.map(day => {
-                  const date = new Date(year, month - 1, day);
-                  const dayOfWeek = date.getDay();
-                  const dayAbbr = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"][
-                    dayOfWeek
-                  ];
-                  const isToday = day === todayDay;
+                  const di = day - 1;
+                  const wd = weekdayForDay(day);
+                  const isTodayCol = di === todayColumnIdx;
                   return (
-                    <th
+                    <div
                       key={day}
-                      ref={isToday ? todayHeaderRef : undefined}
-                      className={isToday ? "is-today-header" : ""}
+                      ref={isTodayCol ? todayHeaderRef : undefined}
+                      className={`mx-head-day${isTodayCol ? " today" : ""}${
+                        wd === "Sa" || wd === "Su" ? " wk" : ""
+                      }`}
+                      onClick={() => isTodayCol && handleDayClick(day)}
+                      onKeyDown={e => {
+                        if (isTodayCol && (e.key === "Enter" || e.key === " ")) {
+                          e.preventDefault();
+                          handleDayClick(day);
+                        }
+                      }}
+                      role={isTodayCol ? "button" : undefined}
+                      tabIndex={isTodayCol ? 0 : undefined}
                     >
-                      <div className="day-header-simple">
-                        <span className="day-abbr">{dayAbbr}</span>
-                        <span className="day-number">{day}</span>
-                      </div>
-                    </th>
+                      <div className="mx-head-dow">{wd}</div>
+                      <div className="mx-head-num">{day}</div>
+                    </div>
                   );
                 })}
-              </tr>
-            </thead>
-            <tbody>
-              {activities.map((activity, activityIndex) => (
-                <tr
-                  key={activity.id}
-                  draggable
-                  onDragStart={e => handleDragStart(e, activity.id)}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={e => handleDragOver(e, activity.id)}
-                  onDrop={e => handleDrop(e, activity.id)}
-                  style={{
-                    opacity: draggedActivityId === activity.id ? 0.4 : 1,
-                    backgroundColor:
-                      dragOverActivityId === activity.id
-                        ? "var(--surface-hover)"
-                        : "",
-                  }}
-                >
-                  <td
-                    className="routine-cell"
-                    style={dragOverActivityId === activity.id ? { borderRight: "3px solid var(--primary-color)" } : undefined}
-                    title="Drag to reorder"
-                  >
-                    <div className="routine-cell-inner">
-                      <span className="cal-drag-handle" aria-hidden>⋮⋮</span>
-                      <span className="routine-cell-name">{activity.name}</span>
-                      {activity.type !== "checkbox" && (
-                        <span className="header-type-badge">
-                          {activity.type === "number" ? "#" : "T"}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  {days.map(day => {
-                    const data = getCompletionData(activity.id, day);
-                    const { isCompleted, note, notes, value, completionColor } = data;
-                    const isInput =
-                      activity.type === "number" || activity.type === "text";
-                    const isToday = day === todayDay;
-                    const hasNotes =
-                      (notes && Array.isArray(notes) && notes.length > 0) ||
-                      (note && note.trim());
-                    const notePreview =
-                      notes && Array.isArray(notes) && notes.length > 0
-                        ? notes[0].substring(0, 50) +
-                          (notes[0].length > 50 ? "..." : "")
-                        : note && note.length > 50
-                        ? note.substring(0, 50) + "..."
-                        : note;
-
-                    return (
-                      <td
-                        key={`${day}-${activity.id}`}
-                        className={`checkbox-cell ${
-                          isToday ? "is-today-cell" : ""
-                        }`}
-                        onDoubleClick={() =>
-                          handleDoubleClick(activity.id, day)
-                        }
-                        onClick={e => {
-                          // Only open day modal if clicking on the cell itself, not on checkbox/input
-                          if (
-                            e.target === e.currentTarget ||
-                            e.target.classList.contains("checkbox-cell")
-                          ) {
-                            if (isToday) {
-                              handleDayClick(day);
-                            }
-                          }
+                {activities.map(activity => {
+                  const codes = Array.from({ length: daysInMonth }, (_, i) =>
+                    getCellCode(activity, i + 1)
+                  );
+                  const rowStat = rowStatsFromCodes(codes, statsDayIdx);
+                  return (
+                    <Fragment key={activity.id}>
+                      <div
+                        className="mx-row-name"
+                        draggable
+                        onDragStart={e => handleDragStart(e, activity.id)}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={e => handleDragOver(e, activity.id)}
+                        onDrop={e => handleDrop(e, activity.id)}
+                        style={{
+                          opacity: draggedActivityId === activity.id ? 0.4 : 1,
+                          outline:
+                            dragOverActivityId === activity.id
+                              ? "2px solid var(--primary-color)"
+                              : undefined,
                         }}
-                        title={
-                          isToday
-                            ? "Click to manage daily tasks"
-                            : hasNotes
-                            ? `Notes: ${notePreview || "View notes"}`
-                            : isInput
-                            ? "Enter value"
-                            : "Double-click to add notes"
-                        }
+                        title="Drag to reorder"
                       >
-                        <div
-                          className="checkbox-container"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          {isInput ? (
-                            <CellInput
-                              type={activity.type}
-                              value={value}
-                              onSave={val =>
-                                onValueChange &&
-                                onValueChange(activity.id, day, val)
-                              }
-                              placeholder="-"
-                            />
-                          ) : (
-                            <button
-                              type="button"
-                              className={`cal-check${isCompleted ? " cal-check--done" : ""}`}
-                              style={isCompleted && completionColor ? { backgroundColor: completionColor, borderColor: completionColor } : undefined}
-                              onClick={e => {
-                                e.stopPropagation();
-                                handleCheckboxChange(activity.id, day);
-                              }}
-                              aria-pressed={isCompleted}
-                              aria-label={`Mark ${activity.name} as completed for day ${day}`}
-                            />
-                          )}
-                          {hasNotes && <div className="note-indicator" />}
-                        </div>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Per-Day Progress Strip */}
-        <div className="cal-progress-strip-wrapper">
-          <div className="cal-progress-strip-label">Daily %</div>
-          <div className="cal-progress-strip">
-            {days.map(day => {
-              const completed = activities.filter(activity => {
-                const { isCompleted } = getCompletionData(activity.id, day);
-                return isCompleted;
-              }).length;
-              const pct = activities.length > 0
-                ? Math.round((completed / activities.length) * 100)
-                : 0;
-              const color = pct >= 80
-                ? "var(--success)"
-                : pct >= 40
-                ? "var(--warning)"
-                : pct > 0
-                ? "var(--danger-color)"
-                : "var(--border)";
-              const isToday = day === todayDay;
-              return (
-                <div
-                  key={day}
-                  className={`cal-progress-cell${isToday ? " cal-progress-cell--today" : ""}`}
-                  title={`Day ${day}: ${pct}% (${completed}/${activities.length})`}
-                >
-                  <div
-                    className="cal-progress-bar"
-                    style={{ height: `${Math.max(pct, 2)}%`, background: color }}
+                        <span className="mx-drag" aria-hidden>
+                          ⋮⋮
+                        </span>
+                        <span className="mx-rn-text">{activity.name}</span>
+                        <span className="mx-rn-meta num">
+                          {Math.round(rowStat.pct * 100)}%
+                        </span>
+                      </div>
+                      {days.map(day => {
+                        const di = day - 1;
+                        const v = getCellCode(activity, day);
+                        const data = getCompletionData(activity.id, day);
+                        const isInput =
+                          activity.type === "number" || activity.type === "text";
+                        const hasNotes =
+                          (data.notes && data.notes.length > 0) ||
+                          (data.note && data.note.trim());
+                        const { extraClass: ucExtra, mxStyle: ucStyle } =
+                          userCompletionClassAndStyle(data.completionColor);
+                        if (isInput) {
+                          return (
+                            <div
+                              key={day}
+                              className={`mxc mxc-f has-input s-${v}${
+                                di === todayColumnIdx ? " today" : ""
+                              }`}
+                              onDoubleClick={() => handleDoubleClick(activity.id, day)}
+                            >
+                              <CellInput
+                                type={activity.type}
+                                value={data.value}
+                                onSave={val =>
+                                  onValueChange && onValueChange(activity.id, day, val)
+                                }
+                                placeholder="-"
+                              />
+                            </div>
+                          );
+                        }
+                        return (
+                          <div
+                            key={day}
+                            className={`mxc mxc-f s-${v}${
+                              di === todayColumnIdx ? " today" : ""
+                            }${ucExtra}`}
+                            style={ucStyle}
+                            role="gridcell"
+                            onMouseDown={() => {
+                              if (v === 4) return;
+                              paintDragRef.current = {
+                                mode: v === 1 ? "off" : "on",
+                              };
+                              handleCheckboxChange(activity.id, day);
+                            }}
+                            onMouseEnter={() => applyPaintIfNeeded(activity, day)}
+                            onMouseUp={endPaintDrag}
+                            onDoubleClick={e => {
+                              e.preventDefault();
+                              handleDoubleClick(activity.id, day);
+                            }}
+                          >
+                            {(v === 1 || v === 2) && (
+                              <svg
+                                viewBox="0 0 24 24"
+                                width="12"
+                                height="12"
+                                fill="none"
+                                stroke="#fff"
+                                strokeWidth="3.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden
+                              >
+                                <path d="m5 12 5 5L20 7" />
+                              </svg>
+                            )}
+                            {hasNotes ? <div className="note-indicator" /> : null}
+                          </div>
+                        );
+                      })}
+                    </Fragment>
+                  );
+                })}
+                <div className="mx-sum-label">Daily %</div>
+                {daily.map((v, di) => (
+                  <DailyBarFaithful
+                    key={di}
+                    v={v}
+                    isToday={di === todayColumnIdx}
                   />
+                ))}
+              </div>
+            </div>
+            <div className="mx-trend-card">
+              <div className="mx-trend-head">
+                <div className="eyebrow">Monthly trend</div>
+                <div className="mx-trend-legend">
+                  <span className="num">{monthAveragePct}%</span>
+                  <span className="muted">month average</span>
                 </div>
-              );
-            })}
+              </div>
+              <TrendSpark trend={trend} daysInMonth={daysInMonth} tone="faithful" />
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Progress Graph */}
-        <div className="progress-graph">
-          <div className="progress-graph-label">Monthly trend</div>
-          <svg
-            className="progress-chart"
-            viewBox={`0 0 ${days.length * 40} 100`}
-            preserveAspectRatio="none"
-          >
-            <defs>
-              <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--secondary-color)" stopOpacity="0.35" />
-                <stop offset="100%" stopColor="var(--secondary-color)" stopOpacity="0.02" />
-              </linearGradient>
-            </defs>
+        {matrixVariant === "rhythm" && (
+          <div className="mx-wrap mx-rhythm">
+            <div
+              ref={scrollContainerRef}
+              className="mx-scroll"
+              onMouseLeave={endPaintDrag}
+            >
+              <div
+                className="mx-grid"
+                style={{
+                  gridTemplateColumns: `240px repeat(${daysInMonth}, 30px) 64px`,
+                }}
+              >
+                <div className="mx-head-routine">Routine</div>
+                {days.map(day => {
+                  const di = day - 1;
+                  const wd = weekdayForDay(day);
+                  const isTodayCol = di === todayColumnIdx;
+                  return (
+                    <div
+                      key={day}
+                      ref={isTodayCol ? todayHeaderRef : undefined}
+                      className={`mx-head-day${isTodayCol ? " today" : ""}${
+                        wd === "Sa" || wd === "Su" ? " wk" : ""
+                      }`}
+                      onClick={() => isTodayCol && handleDayClick(day)}
+                      onKeyDown={e => {
+                        if (isTodayCol && (e.key === "Enter" || e.key === " ")) {
+                          e.preventDefault();
+                          handleDayClick(day);
+                        }
+                      }}
+                      role={isTodayCol ? "button" : undefined}
+                      tabIndex={isTodayCol ? 0 : undefined}
+                    >
+                      <div className="mx-head-num">{day}</div>
+                      <div className="mx-head-dow">{wd.slice(0, 1)}</div>
+                    </div>
+                  );
+                })}
+                <div className="mx-head-stat">%</div>
+                {activities.map(activity => {
+                  const codes = Array.from({ length: daysInMonth }, (_, i) =>
+                    getCellCode(activity, i + 1)
+                  );
+                  const rowStat = rowStatsFromCodes(codes, statsDayIdx);
+                  return (
+                    <Fragment key={activity.id}>
+                      <div
+                        className="mx-row-name"
+                        draggable
+                        onDragStart={e => handleDragStart(e, activity.id)}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={e => handleDragOver(e, activity.id)}
+                        onDrop={e => handleDrop(e, activity.id)}
+                        style={{
+                          opacity: draggedActivityId === activity.id ? 0.4 : 1,
+                          outline:
+                            dragOverActivityId === activity.id
+                              ? "2px solid var(--primary-color)"
+                              : undefined,
+                        }}
+                        title="Drag to reorder"
+                      >
+                        <span className="mx-drag" aria-hidden>
+                          ⋮⋮
+                        </span>
+                        <span className="mx-rn-text">{activity.name}</span>
+                        {rowStat.streak >= 3 ? (
+                          <span className="mx-streak num">{rowStat.streak}</span>
+                        ) : null}
+                      </div>
+                      {days.map(day => {
+                        const di = day - 1;
+                        const wd = weekdayForDay(day);
+                        const v = getCellCode(activity, day);
+                        const data = getCompletionData(activity.id, day);
+                        const isInput =
+                          activity.type === "number" || activity.type === "text";
+                        const wkEnd = wd === "Sa" || wd === "Su";
+                        const { extraClass: ucExtraR, mxStyle: ucStyleR } =
+                          userCompletionClassAndStyle(data.completionColor);
+                        if (isInput) {
+                          return (
+                            <div
+                              key={day}
+                              className={`mxc mxc-r has-input s-${v}${
+                                di === todayColumnIdx ? " today" : ""
+                              }${wkEnd ? " wk" : ""}`}
+                              onDoubleClick={() => handleDoubleClick(activity.id, day)}
+                            >
+                              <CellInput
+                                type={activity.type}
+                                value={data.value}
+                                onSave={val =>
+                                  onValueChange && onValueChange(activity.id, day, val)
+                                }
+                                placeholder="-"
+                              />
+                            </div>
+                          );
+                        }
+                        return (
+                          <div
+                            key={day}
+                            className={`mxc mxc-r s-${v}${
+                              di === todayColumnIdx ? " today" : ""
+                            }${wkEnd ? " wk" : ""}${ucExtraR}`}
+                            style={ucStyleR}
+                            role="gridcell"
+                            onMouseDown={() => {
+                              if (v === 4) return;
+                              paintDragRef.current = {
+                                mode: v === 1 ? "off" : "on",
+                              };
+                              handleCheckboxChange(activity.id, day);
+                            }}
+                            onMouseEnter={() => applyPaintIfNeeded(activity, day)}
+                            onMouseUp={endPaintDrag}
+                            onDoubleClick={e => {
+                              e.preventDefault();
+                              handleDoubleClick(activity.id, day);
+                            }}
+                          >
+                            {v === 2 ? <span className="mxc-r-half" /> : null}
+                          </div>
+                        );
+                      })}
+                      <div className="mx-row-stat num">
+                        {Math.round(rowStat.pct * 100)}
+                      </div>
+                    </Fragment>
+                  );
+                })}
+                <div className="mx-sum-label">Day</div>
+                {daily.map((v, di) => (
+                  <RhythmDailyCell
+                    key={di}
+                    v={v}
+                    isToday={di === todayColumnIdx}
+                  />
+                ))}
+                <div className="mx-sum-stat num">{monthAveragePct}</div>
+              </div>
+            </div>
+            <div className="mx-trend-card">
+              <div className="mx-trend-head">
+                <div className="eyebrow">Monthly trend · 7-day rolling</div>
+              </div>
+              <TrendSpark trend={trend} daysInMonth={daysInMonth} tone="faithful" />
+            </div>
+          </div>
+        )}
 
-            {/* Horizontal grid lines at 25%, 50%, 75% */}
-            {[25, 50, 75].map(pct => (
-              <line
-                key={pct}
-                x1="0"
-                y1={100 - pct}
-                x2={days.length * 40}
-                y2={100 - pct}
-                stroke="var(--border)"
-                strokeWidth="1"
-                strokeDasharray="4 4"
-              />
-            ))}
-
-            {/* Area fill */}
-            <polygon
-              fill="url(#chartGradient)"
-              points={[
-                `0,100`,
-                ...days.map((day, index) => {
-                  const completed = activities.filter(activity => {
-                    const { isCompleted } = getCompletionData(activity.id, day);
-                    return isCompleted;
-                  }).length;
-                  const percentage = activities.length > 0 ? completed / activities.length : 0;
-                  return `${index * 40 + 20},${100 - percentage * 98}`;
-                }),
-                `${(days.length - 1) * 40 + 20},100`,
-              ].join(" ")}
-            />
-
-            {/* Line */}
-            <polyline
-              fill="none"
-              stroke="var(--secondary-color)"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              points={days
-                .map((day, index) => {
-                  const completed = activities.filter(activity => {
-                    const { isCompleted } = getCompletionData(activity.id, day);
-                    return isCompleted;
-                  }).length;
-                  const percentage =
-                    activities.length > 0 ? completed / activities.length : 0;
-                  return `${index * 40 + 20},${100 - percentage * 98}`;
-                })
-                .join(" ")}
-            />
-          </svg>
-        </div>
+        {matrixVariant === "dots" && (
+          <div className="mx-wrap mx-dots">
+            <div className="mxd-ruler">
+              <div className="mxd-ruler-spacer" />
+              <div className="mxd-ruler-track">
+                {Array.from({ length: daysInMonth }, (_, di) => (
+                  <div
+                    key={di}
+                    className={`mxd-ruler-tick${
+                      di === todayColumnIdx ? " today" : ""
+                    }${(di + 1) % 5 === 0 ? " major" : ""}`}
+                    style={{ left: `${(di / daysSpan) * 100}%` }}
+                  >
+                    {((di + 1) % 5 === 0 || di === 0) && (
+                      <span className="mxd-ruler-num num">{di + 1}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="mxd-ruler-stat">
+                this
+                <br />
+                month
+              </div>
+            </div>
+            <div className="mxd-rows">
+              {activities.map(activity => {
+                const codes = Array.from({ length: daysInMonth }, (_, i) =>
+                  getCellCode(activity, i + 1)
+                );
+                const rowStat = rowStatsFromCodes(codes, statsDayIdx);
+                return (
+                  <div className="mxd-row" key={activity.id}>
+                    <div className="mxd-row-head">
+                      <div className="mxd-row-name">{activity.name}</div>
+                      <div className="mxd-row-meta">
+                        <span className="num big">{Math.round(rowStat.pct * 100)}</span>
+                        <span className="muted">%</span>
+                        {rowStat.streak >= 3 ? (
+                          <span className="mxd-streak num">· {rowStat.streak}d streak</span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="mxd-track">
+                      <div className="mxd-rule" />
+                      {days.map(day => {
+                        const di = day - 1;
+                        const leftPct = (di / daysSpan) * 100;
+                        const v = getCellCode(activity, day);
+                        const data = getCompletionData(activity.id, day);
+                        const isInput =
+                          activity.type === "number" || activity.type === "text";
+                        const { extraClass: ucExtraD, mxStyle: ucStyleD } =
+                          userCompletionClassAndStyle(data.completionColor);
+                        if (isInput) {
+                          return (
+                            <div
+                              key={day}
+                              className="mxd-cell-input-wrap"
+                              style={{ left: `${leftPct}%` }}
+                              onDoubleClick={e => {
+                                e.stopPropagation();
+                                handleDoubleClick(activity.id, day);
+                              }}
+                            >
+                              <CellInput
+                                type={activity.type}
+                                value={data.value}
+                                onSave={val =>
+                                  onValueChange && onValueChange(activity.id, day, val)
+                                }
+                                placeholder="—"
+                              />
+                            </div>
+                          );
+                        }
+                        return (
+                          <button
+                            key={day}
+                            type="button"
+                            className={`mxd-dot s-${v}${
+                              di === todayColumnIdx ? " today" : ""
+                            }${ucExtraD}`}
+                            style={{ left: `${leftPct}%`, ...(ucStyleD || {}) }}
+                            disabled={v === 4}
+                            onClick={() => v !== 4 && handleCheckboxChange(activity.id, day)}
+                            onDoubleClick={e => {
+                              e.preventDefault();
+                              handleDoubleClick(activity.id, day);
+                            }}
+                            aria-label={`${activity.name} day ${day}`}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mxd-foot">
+              <div className="mxd-foot-head">
+                <div className="eyebrow">
+                  Daily completion · last {statsDayIdx >= 0 ? statsDayIdx + 1 : 0} days
+                </div>
+                <div className="num">
+                  {monthAveragePct}%
+                  <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>
+                    average
+                  </span>
+                </div>
+              </div>
+              <TrendSpark trend={trend} daysInMonth={daysInMonth} tone="dots" />
+            </div>
+          </div>
+        )}
       </div>
 
-      <dialog ref={dialogRef} className="note-dialog">
-        <div className="note-dialog-content">
-          {/* Header */}
-          <div className="note-dialog-header">
-            <div className="note-dialog-icon">📝</div>
-            <div className="note-dialog-title">
-              <h3>Notes</h3>
-              {editingNote && (() => {
-                const act = activities.find(a => a.id === editingNote.activityId);
-                const date = new Date(year, month - 1, editingNote.day);
-                const dateStr = date.toLocaleDateString("default", { weekday: "short", day: "numeric", month: "short" });
-                return <p className="note-context">{act?.name ?? "Activity"} · {dateStr}</p>;
-              })()}
-            </div>
-            <button className="note-dialog-close" onClick={handleCloseDialog} type="button" aria-label="Close">✕</button>
-          </div>
-
-          {/* Notes body */}
-          <div className="note-dialog-body">
-            {notesList.map((note, index) => (
-              <div key={index} className="note-row">
-                <div className="note-row-num">{index + 1}</div>
-                <textarea
-                  value={note}
-                  onChange={e => handleNoteChange(index, e.target.value)}
-                  placeholder={`Add note ${index + 1}…`}
-                  rows={3}
-                  autoFocus={index === notesList.length - 1 && notesList.length > 0}
-                />
-                {notesList.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveNoteRow(index)}
-                    className="btn-remove-note"
-                    title="Remove note"
-                  >
-                    ×
-                  </button>
-                )}
+      {editingNote && (
+        <div
+          className="mx-modal-scrim"
+          role="presentation"
+          onMouseDown={e => {
+            if (e.target === e.currentTarget) handleCloseDialog();
+          }}
+        >
+          <div
+            className="mx-modal mx-notes-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mx-calendar-notes-title"
+            tabIndex={-1}
+            onMouseDown={e => e.stopPropagation()}
+          >
+            <div className="mx-notes-head">
+              <div className="mx-notes-icon" aria-hidden>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 4h12l4 4v12H4z" />
+                  <path d="M8 10h8M8 14h8M8 18h5" />
+                  <path d="m15 3 2 2-1.5 1.5L13.5 4.5z" fill="#fff" />
+                </svg>
               </div>
-            ))}
-          </div>
-
-          {/* Color accent row */}
-          <div className="note-color-row">
-            <span className="note-color-label">Color</span>
-            <div className="note-color-swatches">
-              {["", "#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#6366f1", "#a855f7", "#ec4899"].map(color => (
-                <button
-                  key={color || "default"}
-                  type="button"
-                  className={`note-color-swatch${noteAccentColor === color ? " note-color-swatch--active" : ""}`}
-                  style={color ? { backgroundColor: color, borderColor: color } : undefined}
-                  title={color || "Default (theme)"}
-                  onClick={() => setNoteAccentColor(color)}
-                >
-                  {!color && <span className="note-color-default-icon">✕</span>}
-                </button>
-              ))}
+              <div className="mx-notes-title">
+                <h2 id="mx-calendar-notes-title" className="mx-notes-h">
+                  Notes
+                </h2>
+                {(() => {
+                  const act = activities.find(a => a.id === editingNote.activityId);
+                  const d = new Date(year, month - 1, editingNote.day);
+                  const dow = d.toLocaleDateString("default", { weekday: "short" });
+                  const mon = d.toLocaleDateString("default", { month: "short" });
+                  return (
+                    <div className="mx-notes-sub">
+                      <span className="mx-notes-dot" aria-hidden />
+                      <span>
+                        {act?.name ?? "Activity"} · {dow}, {mon} {editingNote.day}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+              <button type="button" className="mx-modal-x" onClick={handleCloseDialog} aria-label="Close">
+                <Icon name="close" size={16} />
+              </button>
             </div>
-          </div>
 
-          {/* Footer actions */}
-          <div className="note-dialog-actions">
-            <button onClick={handleAddNoteRow} className="btn btn-secondary" type="button">
-              + Add Note
-            </button>
-            <div className="note-dialog-actions-right">
-              <button onClick={handleCloseDialog} className="btn">Cancel</button>
-              <button onClick={handleSaveNote} className="btn btn-primary">💾 Save</button>
+            <div className="mx-notes-body thin-scroll">
+              {notesList.map((note, index) => (
+                <div key={index} className="mx-note-row">
+                  <div className="mx-note-num num">{index + 1}</div>
+                  <div className="mx-note-field">
+                    <textarea
+                      value={note}
+                      onChange={e => handleNoteChange(index, e.target.value)}
+                      placeholder={`Add note ${index + 1}…`}
+                      rows={3}
+                      autoFocus={index === notesList.length - 1 && notesList.length > 0}
+                    />
+                    {notesList.length > 1 && (
+                      <button
+                        type="button"
+                        className="mx-note-remove"
+                        onClick={() => handleRemoveNoteRow(index)}
+                        aria-label="Remove note"
+                      >
+                        <Icon name="close" size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              <div className="mx-notes-color">
+                <span className="mx-notes-color-label">Color</span>
+                <button
+                  type="button"
+                  className={`mx-swatch mx-swatch-none${noteAccentColor === "" ? " on" : ""}`}
+                  onClick={() => setNoteAccentColor("")}
+                  aria-label="Default completion color"
+                >
+                  <Icon name="close" size={12} />
+                </button>
+                {["#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#6366f1", "#a855f7", "#ec4899"].map(color => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={`mx-swatch${noteAccentColor === color ? " on" : ""}`}
+                    style={{ background: color }}
+                    title={color}
+                    aria-label={`Accent ${color}`}
+                    onClick={() => setNoteAccentColor(color)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="mx-notes-foot">
+              <button type="button" className="btn btn-ghost mx-add-note-btn" onClick={handleAddNoteRow}>
+                <Icon name="plus" size={14} /> Add Note
+              </button>
+              <div className="mx-notes-actions">
+                <button type="button" className="btn btn-ghost" onClick={handleCloseDialog}>
+                  Cancel
+                </button>
+                <button type="button" className="btn btn-primary" onClick={handleSaveNote}>
+                  Save
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </dialog>
+      )}
 
       <DayDetailsModal
         isOpen={!!selectedDayModal}

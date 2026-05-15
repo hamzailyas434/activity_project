@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "../config";
+import { isTokenExpired } from "./jwt";
 
 // Shared promise to deduplicate concurrent refresh calls
 let _refreshPromise = null;
@@ -12,6 +13,20 @@ let _refreshPromise = null;
  * @param {{ token: string|null, refreshTokens: () => Promise<string|null>, logout: () => void }} auth
  */
 export async function apiFetch(url, options = {}, { token, refreshTokens, logout }) {
+  // Proactively refresh if token is already expired — avoids a wasted 401 round-trip
+  if (token && isTokenExpired(token)) {
+    if (!_refreshPromise) {
+      _refreshPromise = refreshTokens().finally(() => { _refreshPromise = null; });
+    }
+    const newToken = await _refreshPromise;
+    if (newToken) {
+      token = newToken;
+    } else {
+      logout();
+      throw new Error("Session expired. Please log in again.");
+    }
+  }
+
   const makeRequest = (t) => {
     const headers = { "Content-Type": "application/json", ...options.headers };
     if (t) headers.Authorization = `Bearer ${t}`;

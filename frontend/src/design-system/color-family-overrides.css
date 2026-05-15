@@ -1,0 +1,173 @@
+/* ============================================================
+   Color family — remaps semantic --accent* on top of
+   colors_and_type.css LIGHT/DARK surfaces (fog canvas + type).
+
+   Pick one primitive lane for interactive emphasis:
+   fog · teal · iris — then light/dark only swaps brightness.
+   ============================================================ */
+
+/* Teal-Slate — matches default Rhythm semantics (explicit for resets). */
+html[data-color-family="teal"][data-theme="light"] {
+  --accent: var(--teal-600);
+  --accent-hover: var(--teal-700);
+  --accent-weak: var(--teal-50);
+  --accent-fg: #ffffff;
+  --primary-light: var(--teal-300);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px rgb(63 107 122 / 0.45);
+  --secondary-color: var(--iris-400);
+  --secondary-dark: var(--iris-600);
+  /* Activities matrix — completion uses Teal-Slate ramp */
+  --mx-done-full: var(--teal-600);
+  --mx-done-ring: var(--teal-500);
+  --mx-done-cell-lt: var(--teal-300);
+  --mx-done-cell-dk: var(--teal-500);
+  --mx-done-partial-lt: var(--teal-50);
+  --mx-done-partial-dk: color-mix(in oklab, var(--teal-400) 30%, transparent);
+  --mx-sum-mid: var(--teal-300);
+  --mx-sum-good: var(--teal-500);
+  --mx-daily-hi-lt: var(--teal-300);
+  --mx-daily-hi-dk: var(--teal-500);
+  --mx-daily-hi-fg-lt: var(--fog-900);
+  --mx-daily-hi-fg-dk: var(--fog-50);
+  --mx-daily-mid-lt: var(--teal-100);
+  --mx-daily-mid-dk: color-mix(in oklab, var(--teal-400) 30%, transparent);
+  --mx-daily-mid-fg-lt: var(--teal-700);
+  --mx-daily-mid-fg-dk: var(--teal-300);
+}
+
+html[data-color-family="teal"][data-theme="dark"] {
+  --accent: var(--teal-500);
+  --accent-hover: var(--teal-400);
+  --accent-weak: #1e333c;
+  --accent-fg: #ffffff;
+  --primary-light: var(--teal-300);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px rgb(79 127 145 / 0.55);
+  --secondary-color: var(--iris-400);
+  --secondary-dark: var(--iris-600);
+  --mx-done-full: var(--teal-500);
+  --mx-done-ring: var(--teal-400);
+  --mx-done-cell-lt: var(--teal-400);
+  --mx-done-cell-dk: var(--teal-500);
+  --mx-done-partial-lt: color-mix(in oklab, var(--teal-500) 22%, transparent);
+  --mx-done-partial-dk: color-mix(in oklab, var(--teal-400) 30%, transparent);
+  --mx-sum-mid: var(--teal-500);
+  --mx-sum-good: var(--teal-400);
+  --mx-daily-hi-lt: var(--teal-500);
+  --mx-daily-hi-dk: var(--teal-400);
+  --mx-daily-hi-fg-lt: var(--fog-50);
+  --mx-daily-hi-fg-dk: var(--fog-50);
+  --mx-daily-mid-lt: color-mix(in oklab, var(--teal-500) 25%, transparent);
+  --mx-daily-mid-dk: color-mix(in oklab, var(--teal-400) 28%, transparent);
+  --mx-daily-mid-fg-lt: var(--teal-200);
+  --mx-daily-mid-fg-dk: var(--teal-200);
+}
+
+/* Fog — monochrome: links & primary actions use the fog ramp only. */
+html[data-color-family="fog"][data-theme="light"] {
+  --accent: var(--fog-700);
+  --accent-hover: var(--fog-800);
+  --accent-weak: var(--fog-100);
+  --accent-fg: #ffffff;
+  --primary-light: var(--fog-400);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px rgb(56 66 82 / 0.4);
+  --secondary-color: var(--fog-500);
+  --secondary-dark: var(--fog-700);
+  --mx-done-full: var(--fog-700);
+  --mx-done-ring: var(--fog-500);
+  --mx-done-cell-lt: var(--fog-300);
+  --mx-done-cell-dk: var(--fog-600);
+  --mx-done-partial-lt: var(--fog-100);
+  --mx-done-partial-dk: color-mix(in oklab, var(--fog-500) 30%, transparent);
+  --mx-sum-mid: var(--fog-300);
+  --mx-sum-good: var(--fog-600);
+  --mx-daily-hi-lt: var(--fog-300);
+  --mx-daily-hi-dk: var(--fog-500);
+  --mx-daily-hi-fg-lt: var(--fog-900);
+  --mx-daily-hi-fg-dk: var(--fog-50);
+  --mx-daily-mid-lt: var(--fog-200);
+  --mx-daily-mid-dk: color-mix(in oklab, var(--fog-500) 30%, transparent);
+  --mx-daily-mid-fg-lt: var(--fog-700);
+  --mx-daily-mid-fg-dk: var(--fog-300);
+}
+
+html[data-color-family="fog"][data-theme="dark"] {
+  --accent: var(--fog-500);
+  --accent-hover: var(--fog-400);
+  --accent-weak: #2a303c;
+  --accent-fg: #ffffff;
+  --primary-light: var(--fog-300);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px rgb(126 138 156 / 0.45);
+  --secondary-color: var(--fog-400);
+  --secondary-dark: var(--fog-300);
+  --mx-done-full: var(--fog-400);
+  --mx-done-ring: var(--fog-400);
+  --mx-done-cell-lt: var(--fog-500);
+  --mx-done-cell-dk: var(--fog-500);
+  --mx-done-partial-lt: color-mix(in oklab, var(--fog-600) 30%, transparent);
+  --mx-done-partial-dk: color-mix(in oklab, var(--fog-500) 28%, transparent);
+  --mx-sum-mid: var(--fog-500);
+  --mx-sum-good: var(--fog-400);
+  --mx-daily-hi-lt: var(--fog-500);
+  --mx-daily-hi-dk: var(--fog-400);
+  --mx-daily-hi-fg-lt: var(--fog-50);
+  --mx-daily-hi-fg-dk: var(--fog-50);
+  --mx-daily-mid-lt: color-mix(in oklab, var(--fog-600) 28%, transparent);
+  --mx-daily-mid-dk: color-mix(in oklab, var(--fog-500) 26%, transparent);
+  --mx-daily-mid-fg-lt: var(--fog-200);
+  --mx-daily-mid-fg-dk: var(--fog-200);
+}
+
+/* Iris — secondary ramp as primary accent (reflective / emphasis lane). */
+html[data-color-family="iris"][data-theme="light"] {
+  --accent: var(--iris-600);
+  --accent-hover: var(--iris-800);
+  --accent-weak: var(--iris-50);
+  --accent-fg: #ffffff;
+  --primary-light: var(--iris-400);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px rgb(126 106 184 / 0.45);
+  --secondary-color: var(--teal-600);
+  --secondary-dark: var(--teal-700);
+  --mx-done-full: var(--iris-600);
+  --mx-done-ring: var(--iris-400);
+  --mx-done-cell-lt: var(--iris-200);
+  --mx-done-cell-dk: var(--iris-600);
+  --mx-done-partial-lt: var(--iris-50);
+  --mx-done-partial-dk: color-mix(in oklab, var(--iris-400) 30%, transparent);
+  --mx-sum-mid: var(--iris-200);
+  --mx-sum-good: var(--iris-600);
+  --mx-daily-hi-lt: var(--iris-200);
+  --mx-daily-hi-dk: var(--iris-600);
+  --mx-daily-hi-fg-lt: var(--fog-900);
+  --mx-daily-hi-fg-dk: var(--fog-50);
+  --mx-daily-mid-lt: var(--iris-50);
+  --mx-daily-mid-dk: color-mix(in oklab, var(--iris-400) 30%, transparent);
+  --mx-daily-mid-fg-lt: var(--iris-800);
+  --mx-daily-mid-fg-dk: var(--iris-400);
+}
+
+html[data-color-family="iris"][data-theme="dark"] {
+  --accent: var(--iris-400);
+  --accent-hover: var(--iris-200);
+  --accent-weak: #2d2640;
+  --accent-fg: #ffffff;
+  --primary-light: var(--iris-200);
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px rgb(160 143 205 / 0.5);
+  --secondary-color: var(--teal-400);
+  --secondary-dark: var(--teal-500);
+  --mx-done-full: var(--iris-400);
+  --mx-done-ring: var(--iris-400);
+  --mx-done-cell-lt: var(--iris-600);
+  --mx-done-cell-dk: var(--iris-400);
+  --mx-done-partial-lt: color-mix(in oklab, var(--iris-600) 24%, transparent);
+  --mx-done-partial-dk: color-mix(in oklab, var(--iris-400) 30%, transparent);
+  --mx-sum-mid: var(--iris-600);
+  --mx-sum-good: var(--iris-400);
+  --mx-daily-hi-lt: var(--iris-600);
+  --mx-daily-hi-dk: var(--iris-400);
+  --mx-daily-hi-fg-lt: var(--fog-50);
+  --mx-daily-hi-fg-dk: var(--fog-50);
+  --mx-daily-mid-lt: color-mix(in oklab, var(--iris-600) 26%, transparent);
+  --mx-daily-mid-dk: color-mix(in oklab, var(--iris-400) 28%, transparent);
+  --mx-daily-mid-fg-lt: var(--iris-200);
+  --mx-daily-mid-fg-dk: var(--iris-200);
+}

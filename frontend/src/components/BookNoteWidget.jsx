@@ -186,9 +186,6 @@ export default function BookNoteWidget({ token, onOpenBook }) {
   const note      = selectedBook ? (bookNotes[noteIndex] ?? null) : randomNote;
   const isLoading = selectedBook ? bookLoading : randomLoading;
 
-  // Measure effect no longer needed (fixed-width thumbnail)
-  // Left here as a no-op to avoid changing hook order; will be cleaned up next refactor.
-
   const pdfFile = useMemo(() => {
     if (!note) return null;
     return {
@@ -319,7 +316,7 @@ export default function BookNoteWidget({ token, onOpenBook }) {
             ) : (
               <div
                 className="text-[0.85rem] leading-[1.6] text-ink break-words"
-                dangerouslySetInnerHTML={{ __html: note.content }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(note.content) }}
               />
             )}
           </div>

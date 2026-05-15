@@ -79,7 +79,8 @@ export default function StickyNoteModal({
           style={{
             background: note.color,
             borderRadius: "var(--r-md)",
-            boxShadow: "inset 0 0 0 1px color-mix(in srgb, #000 8%, transparent)",
+            boxShadow:
+              "inset 0 0 0 1px color-mix(in srgb, var(--fg) 10%, transparent)",
           }}
         >
           <StickyNoteEditor

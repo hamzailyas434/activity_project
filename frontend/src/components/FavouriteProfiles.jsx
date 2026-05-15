@@ -1,549 +1,557 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import Swal from "sweetalert2";
-
 import { API_BASE_URL } from "../config";
 
-const MONTHS = [
-  "January","February","March","April","May","June",
-  "July","August","September","October","November","December",
+const COLORS = [
+  { id: "iris",    bg: "linear-gradient(145deg, var(--iris-400), var(--iris-600))" },
+  { id: "teal",    bg: "linear-gradient(145deg, var(--teal-400), var(--teal-600))" },
+  { id: "mineral", bg: "linear-gradient(145deg, var(--mineral-400), var(--mineral-600))" },
+  { id: "ochre",   bg: "linear-gradient(145deg, var(--ochre-300), var(--ochre-500))" },
+  { id: "dusk",    bg: "linear-gradient(145deg, var(--dusk-300), var(--dusk-500))" },
+  { id: "fog",     bg: "linear-gradient(145deg, var(--fog-400), var(--fog-600))" },
 ];
+const colorBg = id => (COLORS.find(c => c.id === id) || COLORS[0]).bg;
+const RELATIONS = ["Family", "Spouse", "Parent", "Sibling", "Child", "Friend", "Colleague", "Other"];
 
-const currentYear = new Date().getFullYear();
-const YEAR_OPTIONS = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
+const IcoEdit   = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>;
+const IcoTrash  = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M8 6V4h8v2M5 6l1 14h12l1-14"/></svg>;
+const IcoX      = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+const IcoPlus   = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+const IcoSearch = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>;
+const IcoNote   = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 19V5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-2z"/><path d="M4 19a2 2 0 0 1 2-2h13"/></svg>;
+const IcoGift   = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>;
+const IcoInfo   = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="8.01"/></svg>;
+const IcoStar   = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="m12 3 3 7h7l-6 4 2 8-6-5-6 5 2-8-6-4h7z"/></svg>;
 
-const emptyProfile = () => ({ name: "", category: "", notes: "" });
-const emptyRecord  = () => ({
-  month: new Date().getMonth() + 1,
-  year: currentYear,
-  gift_item: "",
-  gift_color: "",
-  note: "",
-});
-
-// ── Shared input/button class snippets ────────────────────────────────────────
-const inputCls = "w-full px-[0.65rem] py-[0.45rem] border-[1.5px] border-edge rounded-lg text-[0.875rem] bg-canvas text-ink outline-none transition-[border-color] duration-150 focus:border-primary font-[inherit]";
-const selectCls = `${inputCls}`;
-const textareaCls = `${inputCls} resize-y`;
-const btnSaveSm = "px-3 py-1 bg-[#16a34a] text-white text-xs font-semibold rounded-md border-none cursor-pointer whitespace-nowrap transition-opacity duration-150 hover:opacity-90";
-const btnCancelSm = "px-3 py-1 bg-[#f1f5f9] text-[#475569] text-xs rounded-md border border-[#e2e8f0] cursor-pointer whitespace-nowrap hover:bg-[#e2e8f0] transition-[background] duration-150";
-const btnIcon = "bg-transparent border-none cursor-pointer text-[0.9rem] p-1 rounded-md transition-[background] duration-150 hover:bg-gtint-hov";
-const labelCls = "block text-xs font-semibold text-ink-muted uppercase tracking-[0.04em]";
-
-// ── Category Row (inline editable) ───────────────────────────────────────────
-function CategoryRow({ row, profileId, onSaved, onDelete }) {
-  const { token } = useAuth();
-  const authHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
-  const [category, setCategory] = useState(row.category || "");
-  const [notes, setNotes]       = useState(row.notes || "");
-  const [editing, setEditing]   = useState(row._new || false);
-
-  const save = async () => {
-    try {
-      if (row._new) {
-        const res = await fetch(`${API_BASE_URL}/favourite-profiles/${profileId}/categories`, {
-          method: "POST", headers: authHeaders,
-          body: JSON.stringify({ category, notes, sort_order: row.sort_order || 0 }),
-        });
-        onSaved(row.id, await res.json());
-      } else {
-        const res = await fetch(`${API_BASE_URL}/favourite-profiles/categories/${row.id}`, {
-          method: "PUT", headers: authHeaders, body: JSON.stringify({ category, notes }),
-        });
-        onSaved(row.id, await res.json());
-      }
-      setEditing(false);
-    } catch { Swal.fire({ icon: "error", title: "Save failed" }); }
-  };
-
-  const rowCls = "border-b border-[#f1f5f9] hover:bg-[#fafafa] transition-[background] duration-100";
-  const cellCls = "px-3 py-[0.45rem] text-[0.84rem] text-[#334155] align-middle";
-
-  if (editing) {
-    return (
-      <tr className={rowCls}>
-        <td className={cellCls}>
-          <input className={inputCls} value={category} onChange={e => setCategory(e.target.value)}
-            placeholder="Category" autoFocus
-            onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") { if (row._new) onDelete(row.id); else setEditing(false); } }} />
-        </td>
-        <td className={cellCls}>
-          <input className={inputCls} value={notes} onChange={e => setNotes(e.target.value)}
-            placeholder="Notes" onKeyDown={e => { if (e.key === "Enter") save(); }} />
-        </td>
-        <td className="px-3 py-[0.45rem] align-middle">
-          <div className="flex gap-1">
-            <button className={btnSaveSm} onClick={save}>✓</button>
-            <button className={btnCancelSm} onClick={() => { if (row._new) onDelete(row.id); else setEditing(false); }}>✕</button>
-          </div>
-        </td>
-      </tr>
-    );
-  }
-
+// ── Profile Card ──────────────────────────────────────────────────────────────
+function ProfileCard({ profile, onOpen, onEdit, onDelete }) {
+  const initial = (profile.name || "?").trim()[0].toUpperCase();
+  const bg = colorBg(profile.color);
   return (
-    <tr className={`${rowCls} cursor-pointer`} onClick={() => setEditing(true)} title="Click to edit">
-      <td className={cellCls}>{category || <em className="text-ink-muted not-italic">—</em>}</td>
-      <td className={`${cellCls} text-ink-muted`}>{notes || <em className="text-ink-muted not-italic">—</em>}</td>
-      <td className="px-3 py-[0.45rem] align-middle">
-        <button className={`${btnIcon} hover:!bg-[#fee2e2]`}
-          onClick={e => { e.stopPropagation(); onDelete(row.id); }} title="Delete">🗑️</button>
-      </td>
-    </tr>
-  );
-}
-
-// ── Monthly Record Row ────────────────────────────────────────────────────────
-function RecordRow({ record, onDelete }) {
-  const cellCls = "px-3 py-[0.45rem] text-[0.83rem] text-[#334155] align-middle";
-  return (
-    <tr className="border-b border-[#f1f5f9] hover:bg-[#fafafa] transition-[background] duration-100">
-      <td className={`${cellCls} font-semibold text-[#1e293b] whitespace-nowrap`}>
-        {MONTHS[record.month - 1]?.slice(0, 3)} {record.year}
-      </td>
-      <td className={cellCls}>{record.gift_item || "—"}</td>
-      <td className={cellCls}>{record.gift_color || "—"}</td>
-      <td className={`${cellCls} text-ink-muted max-w-[150px] truncate`}>{record.note || "—"}</td>
-      <td className="px-3 py-[0.45rem] align-middle">
-        <button className={`${btnIcon} hover:!bg-[#fee2e2]`} title="Delete record" onClick={() => onDelete(record.id)}>🗑️</button>
-      </td>
-    </tr>
-  );
-}
-
-// ── Profile Card ─────────────────────────────────────────────────────────────
-function ProfileCard({ profile, onUpdate, onDelete }) {
-  const { token } = useAuth();
-  const authHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
-
-  const [editing, setEditing] = useState(false);
-  const [form, setForm]       = useState({ name: profile.name, category: profile.category || "", notes: profile.notes || "" });
-  const [catRows, setCatRows] = useState([]);
-  const [loadingCats, setLoadingCats] = useState(false);
-  const [showCats, setShowCats]       = useState(false);
-  const [records, setRecords]         = useState([]);
-  const [loadingRec, setLoadingRec]   = useState(false);
-  const [showRecords, setShowRecords] = useState(false);
-  const [showRecForm, setShowRecForm] = useState(false);
-  const [recForm, setRecForm]         = useState(emptyRecord());
-
-  const loadCats = async () => {
-    setLoadingCats(true);
-    try {
-      const res = await fetch(`${API_BASE_URL}/favourite-profiles/${profile.id}/categories`, { headers: authHeaders });
-      const data = await res.json();
-      setCatRows(Array.isArray(data) ? data : []);
-    } catch { console.error("Failed to load categories"); }
-    finally { setLoadingCats(false); }
-  };
-
-  const toggleCats = () => { if (!showCats) loadCats(); setShowCats(v => !v); };
-
-  const handleAddCatRow = () => {
-    const tempId = `new-${Date.now()}`;
-    setCatRows(prev => [...prev, { id: tempId, category: "", notes: "", sort_order: prev.length, _new: true }]);
-  };
-
-  const handleCatSaved = (tempId, saved) => setCatRows(prev => prev.map(r => r.id === tempId ? saved : r));
-
-  const handleDeleteCat = async (id) => {
-    const isNew = String(id).startsWith("new-");
-    setCatRows(prev => prev.filter(r => r.id !== id));
-    if (!isNew) {
-      try { await fetch(`${API_BASE_URL}/favourite-profiles/categories/${id}`, { method: "DELETE", headers: authHeaders }); }
-      catch { console.error("Failed to delete category"); }
-    }
-  };
-
-  const loadRecords = async () => {
-    setLoadingRec(true);
-    try {
-      const res = await fetch(`${API_BASE_URL}/favourite-profiles/${profile.id}/records`, { headers: authHeaders });
-      const data = await res.json();
-      setRecords(Array.isArray(data) ? data : []);
-    } catch { console.error("Failed to load records"); }
-    finally { setLoadingRec(false); }
-  };
-
-  const toggleRecords = () => { if (!showRecords) loadRecords(); setShowRecords(v => !v); };
-
-  const handleSaveProfile = async () => {
-    if (!form.name.trim()) { Swal.fire({ icon: "warning", title: "Name required" }); return; }
-    try { await onUpdate(profile.id, form); setEditing(false); }
-    catch { Swal.fire({ icon: "error", title: "Save failed" }); }
-  };
-
-  const handleSaveRecord = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await fetch(`${API_BASE_URL}/favourite-profiles/${profile.id}/records`, {
-        method: "POST", headers: authHeaders,
-        body: JSON.stringify({ month: Number(recForm.month), year: Number(recForm.year), gift_item: recForm.gift_item, gift_color: recForm.gift_color, note: recForm.note }),
-      });
-      if (!res.ok) throw new Error();
-      const saved = await res.json();
-      setRecords(prev => {
-        const idx = prev.findIndex(r => r.month === saved.month && r.year === saved.year);
-        return idx >= 0 ? prev.map((r, i) => i === idx ? saved : r) : [saved, ...prev];
-      });
-      setShowRecForm(false);
-      setRecForm(emptyRecord());
-      Swal.fire({ icon: "success", title: "Record saved!", timer: 1200, showConfirmButton: false });
-    } catch { Swal.fire({ icon: "error", title: "Save failed" }); }
-  };
-
-  const handleDeleteRecord = async (id) => {
-    const result = await Swal.fire({ title: "Delete this record?", icon: "warning", showCancelButton: true, confirmButtonColor: "#dc2626", confirmButtonText: "Delete" });
-    if (!result.isConfirmed) return;
-    try {
-      await fetch(`${API_BASE_URL}/favourite-profiles/records/${id}`, { method: "DELETE", headers: authHeaders });
-      setRecords(prev => prev.filter(r => r.id !== id));
-    } catch { Swal.fire({ icon: "error", title: "Delete failed" }); }
-  };
-
-  const toggleBtnCls = "w-full flex items-center justify-between px-5 py-3 text-sm font-medium text-ink cursor-pointer border-none bg-transparent hover:bg-gtint-hov transition-[background] duration-150";
-  const thCls = "px-3 py-2 text-left text-[0.68rem] font-bold uppercase tracking-[0.05em] text-ink-muted bg-[#f8fafc] border-b border-edge";
-
-  return (
-    <div className="glass rounded-2xl overflow-hidden">
-      {/* Card Header */}
-      <div className="flex items-center gap-4 px-5 py-4 border-b border-edge">
-        <div className="fp-avatar">{profile.name.charAt(0).toUpperCase()}</div>
-        <div className="flex-1 min-w-0">
-          {editing
-            ? <input className={inputCls} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Name" autoFocus />
-            : <h3 className="text-base font-bold text-ink m-0">{profile.name}</h3>
-          }
-          {!editing && profile.category && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-gtint-surf text-primary font-semibold mt-0.5 inline-block">
-              {profile.category}
-            </span>
-          )}
-        </div>
-        <div className="flex gap-1 ml-auto shrink-0">
-          {editing ? (
-            <>
-              <button className={btnSaveSm} onClick={handleSaveProfile}>Save</button>
-              <button className={btnCancelSm} onClick={() => { setEditing(false); setForm({ name: profile.name, category: profile.category || "", notes: profile.notes || "" }); }}>Cancel</button>
-            </>
-          ) : (
-            <>
-              <button className={btnIcon} onClick={() => setEditing(true)} title="Edit">✏️</button>
-              <button className={`${btnIcon} hover:!bg-[#fee2e2]`} onClick={() => onDelete(profile.id)} title="Delete">🗑️</button>
-            </>
-          )}
+    <div className="fp-card" style={{ "--av-bg": bg }} onClick={onOpen}>
+      <div className="fp-card-actions" onClick={e => e.stopPropagation()}>
+        <button className="fp-icon-btn" title="Edit" onClick={onEdit}><IcoEdit /></button>
+        <button className="fp-icon-btn fp-icon-btn-danger" title="Delete" onClick={onDelete}><IcoTrash /></button>
+      </div>
+      <div className="fp-card-top">
+        <div className="fp-av" style={{ background: bg }}>{initial}</div>
+        <div className="fp-name-block">
+          <div className="fp-name">{profile.name}</div>
+          <div className="fp-rel">{profile.relation || profile.category || "—"}</div>
         </div>
       </div>
-
-      {/* Inline edit fields */}
-      {editing && (
-        <div className="px-5 py-3 border-b border-edge flex flex-col gap-2">
-          <div className="flex flex-col gap-1">
-            <label className={labelCls}>Category</label>
-            <input className={inputCls} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder="e.g. Family, Work" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className={labelCls}>Notes</label>
-            <textarea className={textareaCls} rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Additional notes…" />
-          </div>
-        </div>
-      )}
-
-      {/* Notes preview */}
-      {!editing && profile.notes && (
-        <div className="px-5 py-3 text-sm text-ink-sub border-b border-edge italic">{profile.notes}</div>
-      )}
-
-      {/* ── Category Rows Table ── */}
-      <div className="border-t border-edge">
-        <button className={toggleBtnCls} onClick={toggleCats}>
-          <span>📋 Category Table</span>
-          <span className="text-xs text-ink-muted">{showCats ? "▲" : "▼"}</span>
-        </button>
-        {showCats && (
-          <div className="border-t border-edge px-4 py-3">
-            {loadingCats ? (
-              <p className="text-sm text-ink-muted italic text-center py-2">Loading…</p>
-            ) : (
-              <table className="w-full border-collapse text-[0.875rem]">
-                <thead>
-                  <tr>
-                    <th className={thCls}>Category</th>
-                    <th className={thCls}>Notes</th>
-                    <th className={thCls}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {catRows.map(row => (
-                    <CategoryRow key={row.id} row={row} profileId={profile.id} onSaved={handleCatSaved} onDelete={handleDeleteCat} />
-                  ))}
-                </tbody>
-              </table>
-            )}
-            <button
-              className="mt-2 text-sm text-primary border border-dashed border-primary rounded-lg px-3 py-1.5 bg-transparent cursor-pointer transition-[background] duration-150 hover:bg-gactive"
-              onClick={handleAddCatRow}
-            >
-              + Add Row
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* ── Monthly Records ── */}
-      <div className="border-t border-edge">
-        <button className={toggleBtnCls} onClick={toggleRecords}>
-          <span>🎁 Monthly Gift Records</span>
-          <span className="text-xs text-ink-muted">{showRecords ? "▲" : "▼"}</span>
-        </button>
-        {showRecords && (
-          <div className="border-t border-edge px-4 py-3">
-            {loadingRec ? (
-              <p className="text-sm text-ink-muted italic text-center py-2">Loading…</p>
-            ) : records.length === 0 && !showRecForm ? (
-              <p className="text-sm text-ink-muted italic text-center py-2">No records yet.</p>
-            ) : (
-              <table className="w-full border-collapse text-[0.875rem]">
-                <thead>
-                  <tr>
-                    {["Month","Gift Item","Color","Note",""].map(h => (
-                      <th key={h} className={thCls}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {records.map(r => <RecordRow key={r.id} record={r} onDelete={handleDeleteRecord} />)}
-                </tbody>
-              </table>
-            )}
-
-            {showRecForm ? (
-              <form className="mt-3 flex flex-col gap-2" onSubmit={handleSaveRecord}>
-                <div className="flex gap-2 flex-wrap">
-                  <select className={`${selectCls} flex-1 min-w-[100px]`} value={recForm.month} onChange={e => setRecForm(f => ({ ...f, month: e.target.value }))}>
-                    {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-                  </select>
-                  <select className={`${selectCls} flex-1 min-w-[80px]`} value={recForm.year} onChange={e => setRecForm(f => ({ ...f, year: e.target.value }))}>
-                    {YEAR_OPTIONS.map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
-                  <input className={`${inputCls} flex-1 min-w-[110px]`} placeholder="Gift item" value={recForm.gift_item} onChange={e => setRecForm(f => ({ ...f, gift_item: e.target.value }))} />
-                  <input className={`${inputCls} flex-1 min-w-[110px]`} placeholder="Color gifted" value={recForm.gift_color} onChange={e => setRecForm(f => ({ ...f, gift_color: e.target.value }))} />
-                </div>
-                <div className="flex gap-2 flex-wrap items-center">
-                  <input className={`${inputCls} flex-[2] min-w-[160px]`} placeholder="Note (optional)" value={recForm.note} onChange={e => setRecForm(f => ({ ...f, note: e.target.value }))} />
-                  <button type="submit" className={btnSaveSm}>Save</button>
-                  <button type="button" className={btnCancelSm} onClick={() => { setShowRecForm(false); setRecForm(emptyRecord()); }}>Cancel</button>
-                </div>
-              </form>
-            ) : (
-              <button
-                className="mt-2 text-sm text-primary border border-dashed border-primary rounded-lg px-3 py-1.5 bg-transparent cursor-pointer transition-[background] duration-150 hover:bg-gactive"
-                onClick={() => setShowRecForm(true)}
-              >
-                + Add Record
-              </button>
-            )}
-          </div>
-        )}
+      <div className="fp-card-stats">
+        <span className="fp-stat"><IcoNote /> <span className="fp-stat-num">{profile.prefs_count ?? 0}</span> prefs</span>
+        <span className="fp-stat-sep">·</span>
+        <span className="fp-stat"><IcoGift /> <span className="fp-stat-num">{profile.gifts_count ?? 0}</span> gifts</span>
       </div>
     </div>
   );
 }
 
-// ── Main FavouriteProfiles Component ─────────────────────────────────────────
+// ── Profile Modal ─────────────────────────────────────────────────────────────
+function ProfileModal({ profile, onSave, onClose, onDelete, authHeaders }) {
+  const isNew = !profile.id;
+  const [tab, setTab] = useState(isNew ? "edit" : profile._openTab || "prefs");
+
+  // Preferences state
+  const [prefs, setPrefs]           = useState([]);
+  const [loadingPrefs, setLoadingPrefs] = useState(false);
+  const [addingPref, setAddingPref] = useState(false);
+  const [pName, setPName]           = useState("");
+  const [pNotes, setPNotes]         = useState("");
+
+  // Gifts state
+  const [gifts, setGifts]           = useState([]);
+  const [loadingGifts, setLoadingGifts] = useState(false);
+  const [addingGift, setAddingGift] = useState(false);
+  const [gName, setGName]           = useState("");
+  const [gDate, setGDate]           = useState("");
+  const [gAmount, setGAmount]       = useState("");
+
+  // Edit state
+  const [name, setName]       = useState(profile.name || "");
+  const [relation, setRelation] = useState(profile.relation || profile.category || "Friend");
+  const [color, setColor]     = useState(profile.color || "iris");
+  const [bday, setBday]       = useState(profile.bday ? profile.bday.split("T")[0] : "");
+  const [phone, setPhone]     = useState(profile.phone || "");
+  const [notes, setNotes]     = useState(profile.notes || "");
+  const [saving, setSaving]   = useState(false);
+
+  useEffect(() => {
+    if (isNew) return;
+    setLoadingPrefs(true);
+    fetch(`${API_BASE_URL}/favourite-profiles/${profile.id}/categories`, { headers: authHeaders })
+      .then(r => r.json()).then(d => setPrefs(Array.isArray(d) ? d : [])).catch(() => {})
+      .finally(() => setLoadingPrefs(false));
+    setLoadingGifts(true);
+    fetch(`${API_BASE_URL}/favourite-profiles/${profile.id}/records`, { headers: authHeaders })
+      .then(r => r.json()).then(d => setGifts(Array.isArray(d) ? d : [])).catch(() => setGifts([]))
+      .finally(() => setLoadingGifts(false));
+  }, [profile.id]); // eslint-disable-line
+
+  // Sync counts back to the card on any close path (Cancel / Done / Esc / scrim click)
+  const handleClose = () => {
+    if (!isNew) {
+      onSave({ ...profile, prefs_count: prefs.length, gifts_count: gifts.length });
+    } else {
+      onClose();
+    }
+  };
+
+  useEffect(() => {
+    const h = e => e.key === "Escape" && handleClose();
+    window.addEventListener("keydown", h);
+    document.body.style.overflow = "hidden";
+    return () => { window.removeEventListener("keydown", h); document.body.style.overflow = ""; };
+  }, []); // eslint-disable-line
+
+  const addPref = async () => {
+    if (!pName.trim()) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/favourite-profiles/${profile.id}/categories`, {
+        method: "POST", headers: authHeaders,
+        body: JSON.stringify({ category: pName.trim(), notes: pNotes.trim(), sort_order: prefs.length }),
+      });
+      const saved = await res.json();
+      setPrefs(prev => [...prev, saved]);
+      setPName(""); setPNotes(""); setAddingPref(false);
+    } catch { /* ignore */ }
+  };
+
+  const delPref = async (id) => {
+    try {
+      await fetch(`${API_BASE_URL}/favourite-profiles/categories/${id}`, { method: "DELETE", headers: authHeaders });
+      setPrefs(prev => prev.filter(p => p.id !== id));
+    } catch { /* ignore */ }
+  };
+
+  const addGift = async () => {
+    if (!gName.trim()) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/favourite-profiles/${profile.id}/records`, {
+        method: "POST", headers: authHeaders,
+        body: JSON.stringify({ gift_item: gName.trim(), gift_date: gDate || null, amount: gAmount || 0, note: "" }),
+      });
+      const saved = await res.json();
+      setGifts(prev => [saved, ...prev]);
+      setGName(""); setGDate(""); setGAmount(""); setAddingGift(false);
+    } catch { /* ignore */ }
+  };
+
+  const delGift = async (id) => {
+    try {
+      await fetch(`${API_BASE_URL}/favourite-profiles/records/${id}`, { method: "DELETE", headers: authHeaders });
+      setGifts(prev => prev.filter(g => g.id !== id));
+    } catch { /* ignore */ }
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      if (isNew) {
+        const res = await fetch(`${API_BASE_URL}/favourite-profiles`, {
+          method: "POST", headers: authHeaders,
+          body: JSON.stringify({ name: name.trim(), relation, color, bday: bday || null, phone, notes }),
+        });
+        if (!res.ok) throw new Error("Create failed");
+        const created = await res.json();
+        onSave(created);
+      } else {
+        const res = await fetch(`${API_BASE_URL}/favourite-profiles/${profile.id}`, {
+          method: "PUT", headers: authHeaders,
+          body: JSON.stringify({ name: name.trim(), relation, color, bday: bday || null, phone, notes }),
+        });
+        if (!res.ok) throw new Error("Update failed");
+        const updated = await res.json();
+        onSave({ ...updated, prefs_count: prefs.length, gifts_count: gifts.length });
+      }
+    } catch {
+      Swal.fire({ icon: "error", title: "Save failed" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const fmt = d => {
+    if (!d) return "—";
+    try { return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }); }
+    catch { return "—"; }
+  };
+  const fmtFull = d => {
+    if (!d) return "Not set";
+    try { return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }); }
+    catch { return d; }
+  };
+  const fmtAmt = n => Number(n || 0).toLocaleString("en-PK");
+
+  // Always use live state so the hero preview updates as the user types / picks color
+  const headerInitial = (name || "?")[0]?.toUpperCase() || "?";
+  const headerName  = name || "New profile";
+  const headerRel   = relation;
+  const headerColor = color;
+
+  return (
+    <div className="fp-scrim" onClick={e => e.target === e.currentTarget && handleClose()}>
+      <div className="fp-modal" style={{ "--av-bg": colorBg(headerColor) }}>
+
+        {/* Hero */}
+        <div className="fp-modal-hero">
+          <div className="fp-modal-hero-row">
+            <div className="fp-modal-av" style={{ background: colorBg(headerColor) }}>{headerInitial}</div>
+            <div className="fp-modal-title-block">
+              <div className="fp-modal-title">{headerName}</div>
+              <div className="fp-modal-meta">
+                <span className="fp-modal-pill">{headerRel || "—"}</span>
+                {!isNew && (
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-muted)" }}>
+                    {prefs.length} prefs · {gifts.length} gifts
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="fp-modal-actions">
+              <button className="fp-modal-close" onClick={handleClose} title="Close"><IcoX /></button>
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        {!isNew && (
+          <div className="fp-modal-tabs">
+            <button className={`fp-m-tab${tab === "prefs" ? " active" : ""}`} onClick={() => setTab("prefs")}>
+              <IcoNote /> Preferences <span className="fp-tab-count">{prefs.length}</span>
+            </button>
+            <button className={`fp-m-tab${tab === "gifts" ? " active" : ""}`} onClick={() => setTab("gifts")}>
+              <IcoGift /> Gifts <span className="fp-tab-count">{gifts.length}</span>
+            </button>
+            <button className={`fp-m-tab${tab === "details" ? " active" : ""}`} onClick={() => setTab("details")}>
+              <IcoInfo /> Details
+            </button>
+            <button className={`fp-m-tab${tab === "edit" ? " active" : ""}`} onClick={() => setTab("edit")}>
+              <IcoEdit /> Edit
+            </button>
+          </div>
+        )}
+
+        {/* Body */}
+        <div className="fp-modal-body">
+
+          {/* PREFERENCES TAB */}
+          {!isNew && tab === "prefs" && (
+            loadingPrefs
+              ? <div className="fp-empty"><div className="fp-em-text">Loading…</div></div>
+              : <>
+                  {prefs.length === 0 && !addingPref && (
+                    <div className="fp-empty">
+                      <div className="fp-em-icon">🗒️</div>
+                      <div className="fp-em-text">No preferences yet</div>
+                      <div className="fp-em-hint">Track what {profile.name} likes — clothing sizes, books, brands…</div>
+                    </div>
+                  )}
+                  {prefs.length > 0 && (
+                    <table className="fp-tbl">
+                      <thead>
+                        <tr>
+                          <th className="fp-c-name">Category</th>
+                          <th className="fp-c-notes">Notes</th>
+                          <th className="fp-c-act"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {prefs.map(p => (
+                          <tr key={p.id}>
+                            <td className="fp-c-name">{p.category}</td>
+                            <td className="fp-c-notes">{p.notes || "—"}</td>
+                            <td className="fp-c-act">
+                              <button className="fp-row-del" onClick={() => delPref(p.id)}><IcoTrash /></button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  {addingPref ? (
+                    <div className="fp-add-inline fp-add-pref">
+                      <input className="fp-add-input" placeholder="Category — Shoes, Books…" value={pName}
+                        onChange={e => setPName(e.target.value)} autoFocus
+                        onKeyDown={e => e.key === "Enter" && addPref()} />
+                      <input className="fp-add-input" placeholder="Notes — size, color, link…" value={pNotes}
+                        onChange={e => setPNotes(e.target.value)}
+                        onKeyDown={e => e.key === "Enter" && addPref()} />
+                      <button className="fp-cancel-sm" onClick={() => { setAddingPref(false); setPName(""); setPNotes(""); }}>Cancel</button>
+                      <button className="fp-add-sm" onClick={addPref}>Add</button>
+                    </div>
+                  ) : (
+                    <button className="fp-add-cta" onClick={() => setAddingPref(true)}><IcoPlus /> Add preference</button>
+                  )}
+                </>
+          )}
+
+          {/* GIFTS TAB */}
+          {!isNew && tab === "gifts" && (
+            loadingGifts
+              ? <div className="fp-empty"><div className="fp-em-text">Loading…</div></div>
+              : <>
+                  {gifts.length === 0 && !addingGift && (
+                    <div className="fp-empty">
+                      <div className="fp-em-icon">🎁</div>
+                      <div className="fp-em-text">No gifts logged yet</div>
+                      <div className="fp-em-hint">Track what you gave — handy for remembering and budgeting.</div>
+                    </div>
+                  )}
+                  {gifts.length > 0 && (
+                    <div className="fp-gift-list">
+                      {gifts.map(gi => (
+                        <div className="fp-gift-row" key={gi.id}>
+                          <span className="fp-gift-name">{gi.gift_item || "—"}</span>
+                          <span className="fp-gift-date">{fmt(gi.gift_date)}</span>
+                          <span className="fp-gift-amt">PKR {fmtAmt(gi.amount)}</span>
+                          <button className="fp-row-del" onClick={() => delGift(gi.id)}><IcoTrash /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {addingGift ? (
+                    <div className="fp-add-inline fp-add-gift">
+                      <input className="fp-add-input" placeholder="Gift name" value={gName}
+                        onChange={e => setGName(e.target.value)} autoFocus />
+                      <input className="fp-add-input" type="date" value={gDate}
+                        onChange={e => setGDate(e.target.value)} />
+                      <input className="fp-add-input" placeholder="PKR amount" value={gAmount}
+                        onChange={e => setGAmount(e.target.value)}
+                        onKeyDown={e => e.key === "Enter" && addGift()} />
+                      <button className="fp-cancel-sm" onClick={() => { setAddingGift(false); setGName(""); setGDate(""); setGAmount(""); }}>Cancel</button>
+                      <button className="fp-add-sm" onClick={addGift}>Add</button>
+                    </div>
+                  ) : (
+                    <button className="fp-add-cta" onClick={() => setAddingGift(true)}><IcoPlus /> Log a gift</button>
+                  )}
+                </>
+          )}
+
+          {/* DETAILS TAB */}
+          {!isNew && tab === "details" && (
+            <div className="fp-details-grid">
+              <div className="fp-det-cell">
+                <div className="fp-det-label">Relation</div>
+                <div className="fp-det-val">{relation || "—"}</div>
+              </div>
+              <div className="fp-det-cell">
+                <div className="fp-det-label">Birthday</div>
+                <div className={`fp-det-val${bday ? "" : " muted"}`}>{fmtFull(bday)}</div>
+              </div>
+              <div className="fp-det-cell">
+                <div className="fp-det-label">Phone</div>
+                <div className={`fp-det-val${phone ? "" : " muted"}`}>{phone || "Not set"}</div>
+              </div>
+              <div className="fp-det-cell">
+                <div className="fp-det-label">Profile color</div>
+                <div className="fp-det-val" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ width: 16, height: 16, borderRadius: "50%", background: colorBg(color), display: "inline-block" }} />
+                  {color || "iris"}
+                </div>
+              </div>
+              {notes && (
+                <div className="fp-det-notes">
+                  <div className="fp-det-label">Private notes</div>
+                  <div className="fp-det-notes-body">{notes}</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* EDIT / NEW TAB */}
+          {(isNew || tab === "edit") && (
+            <div className="fp-edit-grid">
+              <div className="fp-fld">
+                <div className="fp-fld-label">Name</div>
+                <input className="fp-fi" placeholder="e.g. Wife, Ahmed, Mother…" value={name}
+                  onChange={e => setName(e.target.value)} autoFocus={isNew} />
+              </div>
+              <div className="fp-edit-row">
+                <div className="fp-fld">
+                  <div className="fp-fld-label">Relation</div>
+                  <select className="fp-fi fp-fi-sel" value={relation} onChange={e => setRelation(e.target.value)}>
+                    {RELATIONS.map(r => <option key={r}>{r}</option>)}
+                  </select>
+                </div>
+                <div className="fp-fld">
+                  <div className="fp-fld-label">Birthday</div>
+                  <input className="fp-fi" type="date" value={bday} onChange={e => setBday(e.target.value)} />
+                </div>
+              </div>
+              <div className="fp-fld">
+                <div className="fp-fld-label">Phone (optional)</div>
+                <input className="fp-fi" placeholder="+92 …" value={phone} onChange={e => setPhone(e.target.value)} />
+              </div>
+              <div className="fp-fld">
+                <div className="fp-fld-label">Avatar color</div>
+                <div className="fp-color-swatches">
+                  {COLORS.map(c => (
+                    <button key={c.id} className={`fp-color-sw${color === c.id ? " on" : ""}`}
+                      style={{ background: c.bg }} onClick={() => setColor(c.id)} />
+                  ))}
+                </div>
+              </div>
+              <div className="fp-fld">
+                <div className="fp-fld-label">Private notes</div>
+                <textarea className="fp-fi" rows="4"
+                  placeholder="Anything to remember — favourite cuisine, allergies, dislikes…"
+                  value={notes} onChange={e => setNotes(e.target.value)}
+                  style={{ resize: "vertical", minHeight: 80, lineHeight: 1.55 }} />
+              </div>
+            </div>
+          )}
+
+        </div>
+
+        {/* Footer */}
+        <div className="fp-modal-foot">
+          <div className="fp-foot-left">
+            {isNew ? "Add preferences & gifts after saving." : <><kbd>Esc</kbd> to close</>}
+          </div>
+          <div className="fp-foot-right">
+            {!isNew && tab !== "edit" && (
+              <button className="fp-btn-delete" onClick={async () => {
+                const r = await Swal.fire({
+                  title: `Delete ${profile.name}?`,
+                  text: "All data will be permanently deleted.",
+                  icon: "warning", showCancelButton: true,
+                  confirmButtonColor: "#dc2626", confirmButtonText: "Delete",
+                });
+                if (r.isConfirmed) onDelete(profile.id);
+              }}>
+                <IcoTrash /> Delete
+              </button>
+            )}
+            <button className="fp-btn-cancel" onClick={handleClose}>Cancel</button>
+            {(isNew || tab === "edit") && (
+              <button className="fp-btn-save" disabled={!name.trim() || saving} onClick={handleSave}>
+                {isNew ? "✦ Create profile" : "Save changes"}
+              </button>
+            )}
+            {!isNew && tab !== "edit" && (
+              <button className="fp-btn-save" onClick={handleClose}>Done</button>
+            )}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
 export default function FavouriteProfiles() {
   const { token } = useAuth();
   const authHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 
   const [profiles, setProfiles]     = useState([]);
   const [loading, setLoading]       = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newForm, setNewForm]       = useState(emptyProfile());
-  const [rowCount, setRowCount]     = useState(0);
-  const [newCatRows, setNewCatRows] = useState([]);
+  const [search, setSearch]         = useState("");
+  const [openProfile, setOpenProfile] = useState(null);
 
   useEffect(() => {
     if (!token) return;
-    (async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/favourite-profiles`, { headers: authHeaders });
-        const data = await res.json();
-        setProfiles(Array.isArray(data) ? data : []);
-      } catch { console.error("Failed to load profiles"); }
-      finally { setLoading(false); }
-    })();
-  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+    fetch(`${API_BASE_URL}/favourite-profiles`, { headers: authHeaders })
+      .then(r => r.json()).then(d => setProfiles(Array.isArray(d) ? d : [])).catch(() => {})
+      .finally(() => setLoading(false));
+  }, [token]); // eslint-disable-line
 
-  const handleRowCountChange = (val) => {
-    const n = Math.max(0, Math.min(20, parseInt(val) || 0));
-    setRowCount(n);
-    setNewCatRows(Array.from({ length: n }, (_, i) => ({ _tempIdx: i, category: "", notes: "" })));
-  };
-
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    if (!newForm.name.trim()) { Swal.fire({ icon: "warning", title: "Name is required" }); return; }
-    try {
-      const res = await fetch(`${API_BASE_URL}/favourite-profiles`, {
-        method: "POST", headers: authHeaders, body: JSON.stringify(newForm),
-      });
-      const created = await res.json();
-
-      for (let i = 0; i < newCatRows.length; i++) {
-        const row = newCatRows[i];
-        if (row.category.trim() || row.notes.trim()) {
-          await fetch(`${API_BASE_URL}/favourite-profiles/${created.id}/categories`, {
-            method: "POST", headers: authHeaders,
-            body: JSON.stringify({ category: row.category, notes: row.notes, sort_order: i }),
-          });
-        }
-      }
-
-      setProfiles(prev => [...prev, created]);
-      setNewForm(emptyProfile());
-      setNewCatRows([]);
-      setRowCount(0);
-      setShowAddForm(false);
-      Swal.fire({ icon: "success", title: "Profile created!", timer: 1200, showConfirmButton: false });
-    } catch { Swal.fire({ icon: "error", title: "Failed to create profile" }); }
-  };
-
-  const handleUpdate = async (id, fields) => {
-    const res = await fetch(`${API_BASE_URL}/favourite-profiles/${id}`, {
-      method: "PUT", headers: authHeaders, body: JSON.stringify(fields),
+  const handleSave = (saved) => {
+    setProfiles(prev => {
+      const exists = prev.some(p => p.id === saved.id);
+      return exists ? prev.map(p => p.id === saved.id ? { ...p, ...saved } : p) : [...prev, saved];
     });
-    if (!res.ok) throw new Error("Update failed");
-    const updated = await res.json();
-    setProfiles(prev => prev.map(p => p.id === id ? updated : p));
+    setOpenProfile(null);
   };
 
   const handleDelete = async (id) => {
-    const result = await Swal.fire({
-      title: "Delete this profile?", text: "All records will also be deleted.",
-      icon: "warning", showCancelButton: true, confirmButtonColor: "#dc2626", confirmButtonText: "Delete",
-    });
-    if (!result.isConfirmed) return;
     try {
       await fetch(`${API_BASE_URL}/favourite-profiles/${id}`, { method: "DELETE", headers: authHeaders });
       setProfiles(prev => prev.filter(p => p.id !== id));
-    } catch { Swal.fire({ icon: "error", title: "Delete failed" }); }
+      setOpenProfile(null);
+    } catch {
+      Swal.fire({ icon: "error", title: "Delete failed" });
+    }
   };
 
-  const thCls = "px-3 py-2 text-left text-[0.68rem] font-bold uppercase tracking-[0.05em] text-ink-muted bg-[#f8fafc] border-b border-edge";
+  const visible = profiles.filter(p =>
+    !search ||
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    (p.relation || p.category || "").toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
-    <div className="py-6 max-w-[960px] mx-auto animate-fade-in">
-      {/* Page Header */}
-      <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
+    <div className="fp-page">
+      {/* Page head */}
+      <div className="fp-page-head">
         <div>
-          <h2 className="text-2xl font-extrabold text-ink m-0 mb-1 tracking-[-0.02em]">
-            ⭐ Favourite Profiles
-          </h2>
-          <p className="text-[0.88rem] text-ink-muted m-0">
-            Store preferences and monthly gift records for your loved ones
-          </p>
+          <div className="fp-eyebrow">Favourites</div>
+          <div className="fp-h1"><span className="fp-star"><IcoStar /></span>Favourite people</div>
+          <div className="fp-sub">Store preferences, gift records, and notes about people who matter.</div>
         </div>
-        <button
-          className="px-[1.2rem] py-[0.55rem] text-white border-none rounded-[10px] text-[0.875rem] font-semibold cursor-pointer whitespace-nowrap transition-all duration-150 hover:opacity-90 hover:translate-y-[-1px]"
-          style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)" }}
-          onClick={() => setShowAddForm(v => !v)}
-        >
-          {showAddForm ? "✕ Cancel" : "+ New Profile"}
-        </button>
+        <div className="fp-head-actions">
+          <div className="fp-search-wrap">
+            <span className="fp-si"><IcoSearch /></span>
+            <input className="fp-search-input" placeholder="Search by name or relation…"
+              value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          <button className="fp-btn-new" onClick={() => setOpenProfile({})}>
+            <IcoPlus /> New profile
+          </button>
+        </div>
       </div>
 
-      {/* Add Profile Form */}
-      {showAddForm && (
-        <form
-          className="bg-surface border-[1.5px] border-[#fecaca] rounded-2xl px-6 py-5 mb-6"
-          onSubmit={handleCreate}
-        >
-          <h3 className="text-[0.95rem] font-bold text-[#dc2626] m-0 mb-4">New Profile</h3>
-          <div className="grid grid-cols-2 gap-3 mb-4 max-sm:grid-cols-1">
-            <div className="flex flex-col gap-1">
-              <label className={labelCls}>Name *</label>
-              <input className={inputCls} value={newForm.name} onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Mother, Wife" autoFocus />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className={labelCls}>Category</label>
-              <input className={inputCls} value={newForm.category} onChange={e => setNewForm(f => ({ ...f, category: e.target.value }))} placeholder="e.g. Family, Work" />
-            </div>
-            <div className="flex flex-col gap-1 col-span-2 max-sm:col-span-1">
-              <label className={labelCls}>Notes</label>
-              <textarea className={textareaCls} value={newForm.notes} onChange={e => setNewForm(f => ({ ...f, notes: e.target.value }))} placeholder="Any extra details…" rows={2} />
-            </div>
-            <div className="flex flex-col gap-1 col-span-2 max-sm:col-span-1">
-              <label className={labelCls}>How many category rows?</label>
-              <input
-                className={`${inputCls} max-w-[200px]`}
-                type="text" inputMode="numeric"
-                value={rowCount || ""} onChange={e => handleRowCountChange(e.target.value)}
-                placeholder="Enter a number, e.g. 4"
-              />
-            </div>
-            {newCatRows.length > 0 && (
-              <div className="col-span-2 max-sm:col-span-1 overflow-x-auto">
-                <table className="w-full border-collapse text-[0.875rem]">
-                  <thead>
-                    <tr>
-                      <th className={`${thCls} w-8`}>#</th>
-                      <th className={thCls}>Category</th>
-                      <th className={thCls}>Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {newCatRows.map((row, i) => (
-                      <tr key={i} className="border-b border-[#f1f5f9]">
-                        <td className="px-3 py-[0.45rem] text-xs text-ink-muted text-center">{i + 1}</td>
-                        <td className="px-3 py-[0.45rem]">
-                          <input className={inputCls} value={row.category}
-                            onChange={e => setNewCatRows(prev => prev.map((r, idx) => idx === i ? { ...r, category: e.target.value } : r))}
-                            placeholder="Category" />
-                        </td>
-                        <td className="px-3 py-[0.45rem]">
-                          <input className={inputCls} value={row.notes}
-                            onChange={e => setNewCatRows(prev => prev.map((r, idx) => idx === i ? { ...r, notes: e.target.value } : r))}
-                            placeholder="Notes" />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <button type="submit"
-              className="px-5 py-2 text-white border-none rounded-lg text-[0.875rem] font-semibold cursor-pointer transition-opacity duration-150 hover:opacity-90"
-              style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)" }}
-            >
-              Create Profile
-            </button>
-            <button type="button" className={btnCancelSm}
-              onClick={() => { setShowAddForm(false); setNewForm(emptyProfile()); setNewCatRows([]); setRowCount(0); }}>
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Profiles list */}
+      {/* Grid */}
       {loading ? (
-        <div className="flex flex-col items-center gap-4 py-16 text-ink-muted">
-          <div className="w-8 h-8 border-4 border-edge border-t-primary rounded-full animate-spin-slow" />
-          <p>Loading profiles…</p>
-        </div>
-      ) : profiles.length === 0 ? (
-        <div className="text-center py-16 text-ink-muted">
-          <p className="text-4xl mb-2">⭐</p>
-          <p>No profiles yet. Click + New Profile to get started.</p>
-        </div>
+        <div className="fp-loading">Loading profiles…</div>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-6">
-          {profiles.map(p => (
-            <ProfileCard key={p.id} profile={p} onUpdate={handleUpdate} onDelete={handleDelete} />
+        <div className="fp-grid">
+          {visible.length === 0 && (
+            <div className="fp-empty-grid">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" style={{ opacity: .3, marginBottom: 14 }}>
+                <circle cx="12" cy="8" r="4"/><path d="M4 22a8 8 0 0 1 16 0"/>
+              </svg>
+              <div style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "var(--fg)", marginBottom: 6, letterSpacing: "-.01em" }}>
+                {search ? "No matching profiles" : "No profiles yet"}
+              </div>
+              <div style={{ fontSize: 12.5 }}>
+                {search ? "Try a different search, or create a new profile." : "Click + New profile to get started."}
+              </div>
+            </div>
+          )}
+          {visible.map(p => (
+            <ProfileCard
+              key={p.id}
+              profile={p}
+              onOpen={() => setOpenProfile(p)}
+              onEdit={() => setOpenProfile({ ...p, _openTab: "edit" })}
+              onDelete={() => {
+                Swal.fire({
+                  title: `Delete ${p.name}?`, text: "All data will be permanently deleted.",
+                  icon: "warning", showCancelButton: true,
+                  confirmButtonColor: "#dc2626", confirmButtonText: "Delete",
+                }).then(r => r.isConfirmed && handleDelete(p.id));
+              }}
+            />
           ))}
         </div>
+      )}
+
+      {/* Modal */}
+      {openProfile && (
+        <ProfileModal
+          key={(openProfile.id || "new") + (openProfile._openTab || "")}
+          profile={openProfile}
+          onSave={handleSave}
+          onClose={() => setOpenProfile(null)}
+          onDelete={handleDelete}
+          authHeaders={authHeaders}
+        />
       )}
     </div>
   );

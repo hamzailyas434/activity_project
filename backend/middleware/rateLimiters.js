@@ -27,3 +27,12 @@ exports.uploadLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: "Too many file uploads. Please wait." },
 });
+
+// Tight limit for PDF book uploads (100 MB each — prevents disk exhaustion)
+exports.booksUploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many book uploads. Limit is 5 per hour." },
+});

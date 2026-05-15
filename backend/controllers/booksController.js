@@ -1,7 +1,7 @@
 const path = require("path");
 const fs = require("fs");
 const multer = require("multer");
-const pool = require("../config/database");
+const db = require("../config/database");
 
 // ── Multer setup ─────────────────────────────────────────────────────────────
 const storage = multer.diskStorage({
@@ -38,7 +38,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 // GET /api/books
 const listBooks = async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await db.query(
       `SELECT b.id, b.title, b.author, b.total_pages, b.cover_data, b.created_at,
               COALESCE(p.current_page, 1) AS current_page,
               COALESCE(p.last_read_date, NULL) AS last_read_date,
@@ -67,7 +67,7 @@ const uploadBook = [
       if (!title) return res.status(400).json({ error: "Title is required" });
 
       const filePath = `uploads/books/${req.file.filename}`;
-      const [result] = await pool.query(
+      const [result] = await db.query(
         "INSERT INTO books (user_id, title, author, total_pages, file_path) VALUES (?, ?, ?, ?, ?)",
         [req.user.id, title, author || null, parseInt(total_pages) || 0, filePath]
       );
@@ -82,7 +82,7 @@ const uploadBook = [
 // DELETE /api/books/:id
 const deleteBook = async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await db.query(
       "SELECT file_path FROM books WHERE id = ? AND user_id = ?",
       [req.params.id, req.user.id]
     );
@@ -91,7 +91,7 @@ const deleteBook = async (req, res) => {
     const fullPath = path.join(__dirname, "../", rows[0].file_path);
     if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
 
-    await pool.query("DELETE FROM books WHERE id = ? AND user_id = ?", [req.params.id, req.user.id]);
+    await db.query("DELETE FROM books WHERE id = ? AND user_id = ?", [req.params.id, req.user.id]);
     res.json({ success: true });
   } catch (err) {
     console.error("deleteBook error:", err);
@@ -102,7 +102,7 @@ const deleteBook = async (req, res) => {
 // GET /api/books/:id/file  — stream PDF
 const getBookFile = async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await db.query(
       "SELECT file_path FROM books WHERE id = ? AND user_id = ?",
       [req.params.id, req.user.id]
     );
@@ -149,7 +149,7 @@ const updateProgress = async (req, res) => {
     const todayDate = today();
 
     // Ensure book belongs to user
-    const [book] = await pool.query(
+    const [book] = await db.query(
       "SELECT id, total_pages FROM books WHERE id = ? AND user_id = ?",
       [bookId, userId]
     );
@@ -157,11 +157,11 @@ const updateProgress = async (req, res) => {
 
     // Update total_pages if provided
     if (total_pages && parseInt(total_pages) > 0) {
-      await pool.query("UPDATE books SET total_pages = ? WHERE id = ?", [parseInt(total_pages), bookId]);
+      await db.query("UPDATE books SET total_pages = ? WHERE id = ?", [parseInt(total_pages), bookId]);
     }
 
     // Upsert progress
-    const [existing] = await pool.query(
+    const [existing] = await db.query(
       "SELECT id, pages_read_today, last_read_date, current_page FROM book_progress WHERE user_id = ? AND book_id = ?",
       [userId, bookId]
     );
@@ -178,13 +178,13 @@ const updateProgress = async (req, res) => {
       const delta = Math.max(0, (current_page || 1) - (prev.current_page || 1));
       pagesReadToday += delta;
 
-      await pool.query(
+      await db.query(
         "UPDATE book_progress SET current_page = ?, pages_read_today = ?, last_read_date = ? WHERE user_id = ? AND book_id = ?",
         [current_page || 1, pagesReadToday, todayDate, userId, bookId]
       );
       res.json({ current_page, pages_read_today: pagesReadToday });
     } else {
-      await pool.query(
+      await db.query(
         "INSERT INTO book_progress (user_id, book_id, current_page, pages_read_today, last_read_date) VALUES (?, ?, ?, 0, ?)",
         [userId, bookId, current_page || 1, todayDate]
       );
@@ -199,7 +199,7 @@ const updateProgress = async (req, res) => {
 // GET /api/books/:id/highlights
 const getHighlights = async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await db.query(
       "SELECT * FROM book_highlights WHERE book_id = ? AND user_id = ? ORDER BY page_number, created_at",
       [req.params.id, req.user.id]
     );
@@ -215,7 +215,7 @@ const addHighlight = async (req, res) => {
     const { page_number, selected_text, note, color } = req.body;
     if (!selected_text || !page_number) return res.status(400).json({ error: "page_number and selected_text required" });
 
-    const [result] = await pool.query(
+    const [result] = await db.query(
       "INSERT INTO book_highlights (user_id, book_id, page_number, selected_text, note, color) VALUES (?, ?, ?, ?, ?, ?)",
       [req.user.id, req.params.id, page_number, selected_text, note || null, color || "#fef08a"]
     );
@@ -228,7 +228,7 @@ const addHighlight = async (req, res) => {
 // DELETE /api/books/highlights/:highlightId
 const deleteHighlight = async (req, res) => {
   try {
-    await pool.query(
+    await db.query(
       "DELETE FROM book_highlights WHERE id = ? AND user_id = ?",
       [req.params.highlightId, req.user.id]
     );
@@ -241,7 +241,7 @@ const deleteHighlight = async (req, res) => {
 // GET /api/books/reading-goal
 const getReadingGoal = async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await db.query(
       "SELECT daily_pages_goal FROM reading_goals WHERE user_id = ?",
       [req.user.id]
     );
@@ -255,7 +255,7 @@ const getReadingGoal = async (req, res) => {
 const setReadingGoal = async (req, res) => {
   try {
     const { daily_pages_goal } = req.body;
-    await pool.query(
+    await db.query(
       "INSERT INTO reading_goals (user_id, daily_pages_goal) VALUES (?, ?) ON DUPLICATE KEY UPDATE daily_pages_goal = ?",
       [req.user.id, daily_pages_goal, daily_pages_goal]
     );
@@ -272,20 +272,20 @@ const dashboardSummary = async (req, res) => {
     const userId = req.user.id;
 
     // Total pages read today across all books
-    const [pagesRows] = await pool.query(
+    const [pagesRows] = await db.query(
       `SELECT COALESCE(SUM(CASE WHEN last_read_date = ? THEN pages_read_today ELSE 0 END), 0) AS pages_today
        FROM book_progress WHERE user_id = ?`,
       [todayDate, userId]
     );
 
     // Daily goal
-    const [goalRows] = await pool.query(
+    const [goalRows] = await db.query(
       "SELECT daily_pages_goal FROM reading_goals WHERE user_id = ?",
       [userId]
     );
 
     // Currently reading book (most recently updated)
-    const [currentBook] = await pool.query(
+    const [currentBook] = await db.query(
       `SELECT b.title, COALESCE(p.current_page, 1) AS current_page, b.total_pages
        FROM books b
        LEFT JOIN book_progress p ON p.book_id = b.id AND p.user_id = ?
@@ -310,7 +310,7 @@ const dashboardSummary = async (req, res) => {
 // GET /api/books/:id/page-notes/:page
 const getPageNotes = async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await db.query(
       `SELECT id, title, content, is_favourite, created_at, updated_at
        FROM book_page_notes
        WHERE user_id = ? AND book_id = ? AND page_number = ?
@@ -329,7 +329,7 @@ const createPageNote = async (req, res) => {
   try {
     const { page_number, title = "", content = "" } = req.body;
     if (!page_number) return res.status(400).json({ error: "page_number required" });
-    const [result] = await pool.query(
+    const [result] = await db.query(
       "INSERT INTO book_page_notes (user_id, book_id, page_number, title, content) VALUES (?, ?, ?, ?, ?)",
       [req.user.id, req.params.id, page_number, title, content]
     );
@@ -350,7 +350,7 @@ const updatePageNote = async (req, res) => {
     if (content !== undefined) { fields.push("content = ?"); vals.push(content); }
     if (!fields.length) return res.status(400).json({ error: "Nothing to update" });
     vals.push(req.params.noteId, req.user.id);
-    await pool.query(
+    await db.query(
       `UPDATE book_page_notes SET ${fields.join(", ")} WHERE id = ? AND user_id = ?`,
       vals
     );
@@ -364,7 +364,7 @@ const updatePageNote = async (req, res) => {
 // DELETE /api/books/page-notes/:noteId
 const deletePageNote = async (req, res) => {
   try {
-    await pool.query(
+    await db.query(
       "DELETE FROM book_page_notes WHERE id = ? AND user_id = ?",
       [req.params.noteId, req.user.id]
     );
@@ -380,7 +380,7 @@ const updateCover = async (req, res) => {
   try {
     const { cover_data } = req.body;
     if (!cover_data) return res.status(400).json({ error: "cover_data required" });
-    const [result] = await pool.query(
+    const [result] = await db.query(
       "UPDATE books SET cover_data = ? WHERE id = ? AND user_id = ?",
       [cover_data, req.params.id, req.user.id]
     );
@@ -394,7 +394,7 @@ const updateCover = async (req, res) => {
 
 const randomPageNote = async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await db.query(
       `SELECT n.id, n.book_id, n.page_number, n.content, n.is_favourite, b.title AS book_title
        FROM book_page_notes n
        JOIN books b ON b.id = n.book_id
@@ -415,7 +415,7 @@ const randomPageNote = async (req, res) => {
 const notesSummary = async (req, res) => {
   try {
     const EMPTY = ["''", "''", "'<br>'", "'<br/>'", "'<p><br></p>'"];
-    const [rows] = await pool.query(
+    const [rows] = await db.query(
       `SELECT b.id, b.title,
          COUNT(n.id) AS note_count
        FROM books b
@@ -437,7 +437,7 @@ const notesSummary = async (req, res) => {
 
 const getAllPageNotes = async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await db.query(
       `SELECT n.id, n.book_id, n.page_number, n.content, n.is_favourite, n.created_at,
          b.title AS book_title
        FROM book_page_notes n
@@ -458,7 +458,7 @@ const getAllPageNotes = async (req, res) => {
 // GET /api/books/:id/favourite-pages
 const getFavouritePages = async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await db.query(
       `SELECT page_number FROM book_favourite_pages
        WHERE user_id = ? AND book_id = ?
        ORDER BY page_number ASC`,
@@ -479,19 +479,19 @@ const toggleFavouritePage = async (req, res) => {
     const bookId = req.params.id;
     const userId = req.user.id;
 
-    const [existing] = await pool.query(
+    const [existing] = await db.query(
       `SELECT id FROM book_favourite_pages WHERE user_id = ? AND book_id = ? AND page_number = ?`,
       [userId, bookId, page_number]
     );
 
     if (existing.length) {
-      await pool.query(
+      await db.query(
         `DELETE FROM book_favourite_pages WHERE user_id = ? AND book_id = ? AND page_number = ?`,
         [userId, bookId, page_number]
       );
       res.json({ favourited: false, page_number });
     } else {
-      await pool.query(
+      await db.query(
         `INSERT INTO book_favourite_pages (user_id, book_id, page_number) VALUES (?, ?, ?)`,
         [userId, bookId, page_number]
       );
@@ -508,13 +508,13 @@ const toggleFavourite = async (req, res) => {
   try {
     const { noteId } = req.params;
     const userId = req.user.id;
-    await pool.query(
+    await db.query(
       `UPDATE book_page_notes
        SET is_favourite = 1 - is_favourite
        WHERE id = ? AND user_id = ?`,
       [noteId, userId]
     );
-    const [[row]] = await pool.query(
+    const [[row]] = await db.query(
       `SELECT is_favourite FROM book_page_notes WHERE id = ?`,
       [noteId]
     );
@@ -528,7 +528,7 @@ const toggleFavourite = async (req, res) => {
 // GET /api/books/favourite-notes
 const getFavouriteNotes = async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const [rows] = await db.query(
       `SELECT n.id, n.book_id, n.page_number, n.content, n.is_favourite, n.created_at,
               b.title AS book_title
        FROM book_page_notes n

@@ -54,32 +54,48 @@ async function issueTokens(user, res, ip, userAgent) {
   });
 }
 
-// Refresh endpoint — rotate refresh token
+// Refresh endpoint — rotate refresh token (atomic to prevent race conditions)
 exports.refresh = async (req, res) => {
   const rawToken = req.cookies?.refreshToken;
   if (!rawToken) return res.status(401).json({ error: "No refresh token" });
 
   const tokenHash = hashToken(rawToken);
+  let conn;
   try {
-    const [rows] = await db.query(
+    conn = await db.getConnection();
+    await conn.beginTransaction();
+
+    // SELECT … FOR UPDATE locks the row so concurrent requests can't both pass this check
+    const [rows] = await conn.query(
       `SELECT rt.*, u.id as userId, u.username, u.email
        FROM refresh_tokens rt
        JOIN users u ON rt.user_id = u.id
-       WHERE rt.token_hash = ? AND rt.revoked_at IS NULL AND rt.expires_at > NOW()`,
+       WHERE rt.token_hash = ? AND rt.revoked_at IS NULL AND rt.expires_at > NOW()
+       FOR UPDATE`,
       [tokenHash]
     );
 
     if (rows.length === 0) {
+      await conn.rollback();
+      conn.release();
+      conn = null;
       res.clearCookie("refreshToken", { path: "/api/users/refresh" });
       return res.status(401).json({ error: "Invalid or expired refresh token" });
     }
 
     const row = rows[0];
 
-    // Revoke old token (rotation)
-    await db.query("UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = ?", [tokenHash]);
+    // Revoke old token (rotation) — inside the same transaction
+    await conn.query(
+      "UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = ?",
+      [tokenHash]
+    );
 
-    // Issue new tokens
+    await conn.commit();
+    conn.release();
+    conn = null;
+
+    // Issue new tokens (separate connection — doesn't need to be in the transaction)
     await issueTokens(
       { id: row.userId, username: row.username, email: row.email },
       res,
@@ -87,6 +103,10 @@ exports.refresh = async (req, res) => {
       req.headers["user-agent"]
     );
   } catch (error) {
+    if (conn) {
+      try { await conn.rollback(); } catch (_) {}
+      conn.release();
+    }
     console.error("Refresh token error:", error);
     res.status(500).json({ error: "Failed to refresh session" });
   }

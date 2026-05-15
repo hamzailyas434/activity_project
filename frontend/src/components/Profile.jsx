@@ -107,7 +107,6 @@ function Profile({ onUpdate }) {
       
       if (newUsername && newUsername.toLowerCase() !== currentUsername) {
         updatePayload.username = newUsername;
-        console.log("Username change detected:", { current: currentUsername, new: newUsername });
       }
       
       // Check first name
@@ -132,7 +131,6 @@ function Profile({ onUpdate }) {
       
       if (newEmail && newEmail !== currentEmail) {
         updatePayload.email = newEmail;
-        console.log("Email change detected:", { current: currentEmail, new: newEmail });
       }
       
       // Check profile picture
@@ -153,7 +151,6 @@ function Profile({ onUpdate }) {
       });
 
       const data = await res.json();
-      console.log("Response:", { status: res.status, data });
 
       if (res.ok) {
         setUser(data);

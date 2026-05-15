@@ -1,8 +1,11 @@
 const jwt = require("jsonwebtoken");
 const db = require("../config/database");
 
-const JWT_SECRET =
-  process.env.JWT_SECRET || "your-secret-key-change-in-production";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error("FATAL: JWT_SECRET environment variable is not set. Refusing to start.");
+  process.exit(1);
+}
 
 // Middleware to verify JWT token (accepts httpOnly cookie or Bearer token)
 const authenticateToken = async (req, res, next) => {

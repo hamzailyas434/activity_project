@@ -3,788 +3,550 @@ import DOMPurify from "dompurify";
 import { useAuth } from "../contexts/AuthContext";
 import RichTextEditor from "./RichTextEditor";
 import { useToast } from "./ToastContainer";
-
 import { API_BASE_URL } from "../config";
 
+/* ── Inline icons ── */
+const IcoSearch  = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>;
+const IcoPlus    = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+const IcoEdit    = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>;
+const IcoTrash   = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M8 6V4h8v2M5 6l1 14h12l1-14"/></svg>;
+const IcoX       = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+const IcoCat     = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 7h18M3 12h18M3 17h12"/></svg>;
+const IcoQ       = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4 2c-.7.5-1.5 1.2-1.5 2.5"/><line x1="12" y1="17" x2="12" y2="17.01"/></svg>;
+const IcoAns     = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>;
+const IcoCheck   = () => <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="m5 12 5 5L20 7"/></svg>;
+const IcoBulb    = () => <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M9 21h6v-1H9zm3-19a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>;
+const IcoDoc     = () => <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round"><rect x="4" y="2" width="14" height="20" rx="2"/><line x1="8" y1="10" x2="14" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>;
+
+const SANITIZE_OPTS = { FORBID_ATTR: ["style"], FORBID_TAGS: ["font", "iframe", "object", "embed"] };
+const sanitize = html => DOMPurify.sanitize(html || "", SANITIZE_OPTS);
+
+function fmtDate(d) {
+  return new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+
+/* ── Notes component ── */
 function Notes() {
   const { token } = useAuth();
   const { showToast, ToastContainer } = useToast();
-  const [notes, setNotes] = useState([]);
+
+  const [notes, setNotes]         = useState([]);
   const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
+  const [loading, setLoading]     = useState(true);
+
+  const [view, setView]           = useState("list"); // "list" | "form"
   const [editingNote, setEditingNote] = useState(null);
+  const [activeNoteId, setActiveNoteId] = useState(null);
+  const [fullActiveNote, setFullActiveNote] = useState(null);
+
   const [selectedCategory, setSelectedCategory] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [limit, setLimit] = useState(100);
-  const [expandedNotes, setExpandedNotes] = useState(new Set());
-  const [modalNote, setModalNote] = useState(null);
-  const [newCategoryName, setNewCategoryName] = useState("");
+
+  const [newCategoryName, setNewCategoryName]     = useState("");
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
+
   const [formData, setFormData] = useState({
     category: "",
     question: "",
-    answer: "",
     answers: [{ answer: "", is_very_good: false }],
   });
-  const [editingAnswerId, setEditingAnswerId] = useState(null);
 
-  const authFetch = (url, options = {}) => {
-    return fetch(url, {
-      ...options,
+  /* ── Auth fetch ── */
+  const authFetch = (url, opts = {}) =>
+    fetch(url, {
+      ...opts,
       headers: {
-        ...options.headers,
+        ...opts.headers,
         Authorization: `Bearer ${token}`,
-        "Content-Type": options.headers?.["Content-Type"] || "application/json",
+        "Content-Type": opts.headers?.["Content-Type"] || "application/json",
       },
     });
-  };
 
-  useEffect(() => {
-    fetchNotes();
-    fetchCategories();
-  }, [token, selectedCategory, searchTerm, limit]);
+  /* ── Data fetching ── */
+  useEffect(() => { fetchNotes(); fetchCategories(); }, [token, selectedCategory, searchTerm]);
 
   const fetchNotes = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
-      if (selectedCategory) params.append("category", selectedCategory);
-      if (searchTerm) params.append("search", searchTerm);
-      if (limit) params.append("limit", limit);
-
-      const res = await authFetch(
-        `${API_BASE_URL}/notes?${params.toString()}`
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setNotes(data);
-      }
-    } catch (error) {
-      console.error("Error fetching notes:", error);
-    } finally {
-      setLoading(false);
-    }
+      const p = new URLSearchParams();
+      if (selectedCategory) p.append("category", selectedCategory);
+      if (searchTerm)        p.append("search", searchTerm);
+      p.append("limit", "200");
+      const r = await authFetch(`${API_BASE_URL}/notes?${p}`);
+      if (r.ok) setNotes(await r.json());
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
   const fetchCategories = async () => {
     try {
-      const res = await authFetch(`${API_BASE_URL}/notes/categories`);
-      if (res.ok) {
-        const data = await res.json();
-        setCategories(data);
-      }
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-    }
+      const r = await authFetch(`${API_BASE_URL}/notes/categories`);
+      if (r.ok) setCategories(await r.json());
+    } catch (e) { console.error(e); }
   };
 
+  /* ── Load full note for reading pane ── */
+  const activeNote = notes.find(n => n.id === activeNoteId) ?? notes[0] ?? null;
 
-  const handleAddCategory = async () => {
-    if (!newCategoryName.trim()) {
-      setShowNewCategoryInput(false);
-      return;
-    }
+  useEffect(() => {
+    if (!activeNote) { setFullActiveNote(null); return; }
+    authFetch(`${API_BASE_URL}/notes/${activeNote.id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => d && setFullActiveNote(d))
+      .catch(() => setFullActiveNote(activeNote));
+  }, [activeNote?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const category = newCategoryName.trim();
-    // Categories are created automatically when notes are added, so just update local state
-    if (!categories.includes(category)) {
-      setCategories([...categories, category].sort());
-    }
-    setFormData({ ...formData, category });
-    setNewCategoryName("");
+  const displayedNote = fullActiveNote?.id === activeNote?.id ? fullActiveNote : activeNote;
+
+  /* ── Form helpers ── */
+  const startCreate = () => {
+    setEditingNote(null);
+    setFormData({ category: "", question: "", answers: [{ answer: "", is_very_good: false }] });
+    setView("form");
+  };
+
+  const startEdit = note => {
+    const answers = note.answers?.length > 0
+      ? note.answers.map(a => ({ answer: a.answer || "", is_very_good: a.is_very_good || false }))
+      : [{ answer: note.answer || "", is_very_good: false }];
+    setEditingNote(note);
+    setFormData({ category: note.category || "", question: note.question || "", answers });
+    setView("form");
+  };
+
+  const cancelForm = () => {
+    setView("list");
+    setEditingNote(null);
     setShowNewCategoryInput(false);
+    setNewCategoryName("");
+    setFormData({ category: "", question: "", answers: [{ answer: "", is_very_good: false }] });
   };
 
   const handleSubmit = async e => {
     e.preventDefault();
+    const valid = formData.answers.filter(a => {
+      const txt = String(a.answer || "").replace(/<[^>]*>/g, "").trim();
+      return txt.length > 0 || String(a.answer || "").trim().length > 0;
+    });
+    if (!valid.length)              { showToast("At least one answer is required", "error"); return; }
+    if (!formData.category?.trim()) { showToast("Category is required", "error"); return; }
+    if (!formData.question?.trim()) { showToast("Question is required", "error"); return; }
+
     try {
-      const url = editingNote
-        ? `${API_BASE_URL}/notes/${editingNote.id}`
-        : `${API_BASE_URL}/notes`;
-      const method = editingNote ? "PUT" : "POST";
-
-      // Filter out completely empty answers (but keep answers with HTML/whitespace)
-      const validAnswers = formData.answers.filter(a => {
-        if (!a.answer) return false;
-        const answerStr = String(a.answer);
-        // Remove HTML tags and check if there's actual content
-        const textContent = answerStr.replace(/<[^>]*>/g, '').trim();
-        // Keep if there's text content OR if the original string has any length (might be HTML)
-        const hasContent = textContent.length > 0 || answerStr.trim().length > 0;
-        console.log("Filtering answer:", {
-          originalLength: answerStr.length,
-          textContentLength: textContent.length,
-          trimmedLength: answerStr.trim().length,
-          hasContent,
-          preview: answerStr.substring(0, 50)
-        });
-        return hasContent;
-      });
-      
-      if (validAnswers.length === 0) {
-        showToast("At least one answer is required", "error");
-        return;
-      }
-      
-      console.log("Valid answers after filtering:", validAnswers.length, "out of", formData.answers.length);
-
-      // Ensure category is not empty
-      if (!formData.category || formData.category.trim() === "") {
-        showToast("Category is required", "error");
-        return;
-      }
-
-      // Ensure question is not empty
-      if (!formData.question || formData.question.trim() === "") {
-        showToast("Question is required", "error");
-        return;
-      }
-
-      const payload = {
-        category: formData.category.trim(),
-        question: formData.question.trim(),
-        answers: validAnswers,
-      };
-
-      console.log("Submitting note:", { 
-        editing: !!editingNote, 
-        category: payload.category,
-        question: payload.question.substring(0, 50),
-        answersCount: validAnswers.length,
-        answers: validAnswers.map(a => ({ 
-          answerLength: a.answer?.length || 0,
-          answerPreview: String(a.answer || "").substring(0, 30),
-          is_very_good: a.is_very_good 
-        }))
-      });
-
-      const res = await authFetch(url, {
+      const savedId = editingNote?.id;
+      const url     = editingNote ? `${API_BASE_URL}/notes/${editingNote.id}` : `${API_BASE_URL}/notes`;
+      const method  = editingNote ? "PUT" : "POST";
+      const r = await authFetch(url, {
         method,
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ category: formData.category.trim(), question: formData.question.trim(), answers: valid }),
       });
-
-      if (res.ok) {
+      if (r.ok) {
         await fetchNotes();
         fetchCategories();
-        setShowForm(false);
-        setEditingNote(null);
-        setFormData({ category: "", question: "", answer: "", answers: [{ answer: "", is_very_good: false }] });
-        showToast(editingNote ? "Note updated successfully!" : "Note created successfully!", "success");
+        setFullActiveNote(null);       // clear stale cache so reading pane shows fresh data
+        if (savedId) setActiveNoteId(savedId); // keep same note selected
+        cancelForm();
+        showToast(editingNote ? "Note updated!" : "Note created!", "success");
       } else {
-        const errorData = await res.json().catch(() => ({}));
-        console.error("Error response:", { status: res.status, errorData });
-        const errorMessage = errorData.error || errorData.details || `Server error (${res.status})`;
-        console.error("Full error details:", JSON.stringify(errorData, null, 2));
-        console.error("Error message:", errorMessage);
-        console.error("Error details:", errorData.details);
-        console.error("Error received:", errorData.received);
-        showToast(`Failed to save note: ${errorMessage}`, "error");
+        const err = await r.json().catch(() => ({}));
+        showToast(`Failed: ${err.error || "Unknown error"}`, "error");
       }
-    } catch (error) {
-      console.error("Error saving note:", error);
-      showToast(`Error: ${error.message || "Failed to save note"}`, "error");
-    }
-  };
-
-  const handleEdit = note => {
-    setEditingNote(note);
-    // Use answers array if available, otherwise use legacy answer field
-    const answers = note.answers && note.answers.length > 0
-      ? note.answers.map(a => ({ answer: a.answer || "", is_very_good: a.is_very_good || false }))
-      : (note.answer ? [{ answer: note.answer, is_very_good: false }] : [{ answer: "", is_very_good: false }]);
-    
-    setFormData({
-      category: note.category || "",
-      question: note.question || "",
-      answer: note.answer || "",
-      answers: answers,
-    });
-    setShowForm(true);
-    // Scroll to form
-    setTimeout(() => {
-      document.querySelector(".note-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 100);
+    } catch (e) { showToast(`Error: ${e.message}`, "error"); }
   };
 
   const handleDelete = async id => {
-    if (!window.confirm("Are you sure you want to delete this note?")) return;
-
+    if (!window.confirm("Delete this note?")) return;
     try {
-      const res = await authFetch(`${API_BASE_URL}/notes/${id}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
+      const r = await authFetch(`${API_BASE_URL}/notes/${id}`, { method: "DELETE" });
+      if (r.ok) {
+        if (activeNoteId === id) setActiveNoteId(null);
         fetchNotes();
         fetchCategories();
-        showToast("Note deleted successfully!", "success");
+        if (view === "form") setView("list");
+        showToast("Note deleted!", "success");
       } else {
-        const errorData = await res.json().catch(() => ({}));
-        showToast(`Failed to delete note: ${errorData.error || "Unknown error"}`, "error");
+        const err = await r.json().catch(() => ({}));
+        showToast(`Failed: ${err.error || "Unknown error"}`, "error");
       }
-    } catch (error) {
-      console.error("Error deleting note:", error);
-      showToast(`Error: ${error.message || "Failed to delete note"}`, "error");
-    }
+    } catch (e) { showToast(`Error: ${e.message}`, "error"); }
   };
 
-  const toggleExpand = id => {
-    const newExpanded = new Set(expandedNotes);
-    if (newExpanded.has(id)) {
-      newExpanded.delete(id);
-    } else {
-      newExpanded.add(id);
-    }
-    setExpandedNotes(newExpanded);
+  const handleAddCategory = () => {
+    if (!newCategoryName.trim()) { setShowNewCategoryInput(false); return; }
+    const cat = newCategoryName.trim();
+    if (!categories.includes(cat)) setCategories(prev => [...prev, cat].sort());
+    setFormData(f => ({ ...f, category: cat }));
+    setNewCategoryName("");
+    setShowNewCategoryInput(false);
   };
 
-  const openModal = async note => {
-    // If note doesn't have answers array, fetch full note details
-    if (!note.answers || note.answers.length === 0) {
-      try {
-        const res = await authFetch(`${API_BASE_URL}/notes/${note.id}`);
-        if (res.ok) {
-          const fullNote = await res.json();
-          setModalNote(fullNote);
-        } else {
-          // Fallback to the note we have
-          setModalNote(note);
-        }
-      } catch (error) {
-        console.error("Error fetching full note:", error);
-        // Fallback to the note we have
-        setModalNote(note);
-      }
-    } else {
-      setModalNote(note);
-    }
-  };
-
-  const closeModal = () => {
-    setModalNote(null);
-  };
-
-  const renderAnswer = answer => {
-    if (!answer) return "";
-    return <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(answer) }} />;
-  };
-
-  if (loading && notes.length === 0) {
+  /* ══════════════════════════════════════════
+     FORM VIEW
+  ══════════════════════════════════════════ */
+  if (view === "form") {
     return (
-      <div className="notes-loading">
-        <div className="loading-spinner"></div>
-        <p>Loading notes...</p>
+      <div className="notes-form-view">
+        <ToastContainer />
+
+        {/* Breadcrumb */}
+        <div className="nf-crumb">
+          <a className="nf-crumb-link" onClick={() => setView("list")}>Notes</a>
+          {editingNote && (
+            <>
+              <span className="nf-crumb-sep">/</span>
+              <a className="nf-crumb-link" onClick={() => setView("list")}>{editingNote.category}</a>
+            </>
+          )}
+          <span className="nf-crumb-sep">/</span>
+          <span className="nf-crumb-current">{editingNote ? "Edit" : "New note"}</span>
+        </div>
+
+        {/* Page head */}
+        <div className="nf-page-head">
+          <div>
+            <div className={`eyebrow nf-eyebrow${editingNote ? " nf-eyebrow-edit" : ""}`}>
+              {editingNote && <span className="nf-eyebrow-dot" />}
+              {editingNote ? "Editing note" : "Notes & Q&A"}
+            </div>
+            <div className="nf-h1">
+              {editingNote ? "Edit note" : "Create a new note"}
+              {editingNote && (
+                <span className="nf-h1-q">
+                  &ldquo;{editingNote.question.length > 60 ? editingNote.question.slice(0, 60) + "…" : editingNote.question}&rdquo;
+                </span>
+              )}
+            </div>
+            {!editingNote && (
+              <div className="nf-sub">
+                Capture a question and one or more answers. Keep them private and search them later.
+              </div>
+            )}
+          </div>
+          <div className="nf-head-actions">
+            {showNewCategoryInput ? (
+              <div className="nf-cat-input-row">
+                <input
+                  type="text"
+                  className="nf-cat-input"
+                  placeholder="Category name"
+                  value={newCategoryName}
+                  onChange={e => setNewCategoryName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") handleAddCategory();
+                    if (e.key === "Escape") { setShowNewCategoryInput(false); setNewCategoryName(""); }
+                  }}
+                  autoFocus
+                />
+                <button type="button" className="nf-btn-ghost" onClick={handleAddCategory}>Add</button>
+                <button type="button" className="nf-btn-ghost" onClick={() => { setShowNewCategoryInput(false); setNewCategoryName(""); }}>
+                  <IcoX />
+                </button>
+              </div>
+            ) : (
+              <button type="button" className="nf-btn-ghost" onClick={() => setShowNewCategoryInput(true)}>
+                <IcoPlus /> Category
+              </button>
+            )}
+            {editingNote && (
+              <button type="button" className="nf-btn-ghost nf-btn-ghost-danger" onClick={() => handleDelete(editingNote.id)}>
+                <IcoTrash /> Delete
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Form card */}
+        <form className="nf-form-card" onSubmit={handleSubmit}>
+          <div className="nf-form-card-head">
+            <div className="nf-form-card-title">
+              <div className={`nf-title-icon${editingNote ? " nf-title-icon-edit" : " nf-title-icon-create"}`}>
+                {editingNote
+                  ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                  : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                }
+              </div>
+              {editingNote ? "Edit details" : "New note"}
+            </div>
+            <button type="button" className="icon-btn" onClick={cancelForm} title="Close"><IcoX /></button>
+          </div>
+
+          <div className="nf-form-card-body">
+            {/* Category */}
+            <div className="nf-field">
+              <div className="nf-field-label"><IcoCat /> Category</div>
+              <select
+                className="fi-select"
+                value={formData.category}
+                onChange={e => setFormData(f => ({ ...f, category: e.target.value }))}
+                required
+              >
+                <option value="">Select a category…</option>
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              {!editingNote && (
+                <div className="nf-field-tip">
+                  <span className="nf-field-tip-bulb"><IcoBulb /></span>
+                  Tip — add a new category with the &quot;+ Category&quot; button above.
+                </div>
+              )}
+            </div>
+
+            {/* Question */}
+            <div className="nf-field">
+              <div className="nf-field-label"><IcoQ /> Question</div>
+              <textarea
+                className="fi-textarea"
+                placeholder="What's your question? — keep it short and specific."
+                value={formData.question}
+                onChange={e => setFormData(f => ({ ...f, question: e.target.value }))}
+                required
+              />
+            </div>
+
+            {/* Answers */}
+            <div className="nf-field">
+              <div className="nf-field-label" style={{ justifyContent: "space-between" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}><IcoAns /> Answers</span>
+                <span style={{ textTransform: "none", color: "var(--fg-faint)", letterSpacing: ".02em", fontWeight: 400 }}>
+                  {formData.answers.length} total · {formData.answers.filter(a => a.is_very_good).length} marked &quot;very good&quot;
+                </span>
+              </div>
+              {!editingNote && (
+                <div className="nf-field-tip" style={{ marginBottom: 10 }}>
+                  <span className="nf-field-tip-bulb"><IcoBulb /></span>
+                  Add multiple answers — mark the best one as{" "}
+                  <strong style={{ color: "var(--mineral-400)" }}>Very good</strong>.
+                </div>
+              )}
+              <div className="nf-answers-list">
+                {formData.answers.map((ans, i) => (
+                  <div key={i} className={`nf-answer-card${ans.is_very_good ? " very-good" : ""}`}>
+                    <div className="nf-answer-card-head">
+                      <span className="nf-answer-num">
+                        <span className="nf-answer-num-badge">{i + 1}</span>
+                        Answer
+                      </span>
+                      <div className="nf-answer-card-actions">
+                        <label className={`nf-very-good-toggle${ans.is_very_good ? " on" : ""}`}>
+                          <input
+                            type="checkbox"
+                            checked={ans.is_very_good || false}
+                            onChange={e => {
+                              const next = [...formData.answers];
+                              next[i] = { ...next[i], is_very_good: e.target.checked };
+                              setFormData(f => ({ ...f, answers: next }));
+                            }}
+                          />
+                          <IcoCheck /> Very good
+                        </label>
+                        {formData.answers.length > 1 && (
+                          <button
+                            type="button"
+                            className="nf-remove-btn"
+                            onClick={() => {
+                              const next = formData.answers.filter((_, idx) => idx !== i);
+                              setFormData(f => ({ ...f, answers: next.length ? next : [{ answer: "", is_very_good: false }] }));
+                            }}
+                            title="Remove answer"
+                          >
+                            <IcoTrash />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <RichTextEditor
+                      value={ans.answer}
+                      onChange={answer => {
+                        const next = [...formData.answers];
+                        next[i] = { ...next[i], answer };
+                        setFormData(f => ({ ...f, answers: next }));
+                      }}
+                      placeholder={`Enter answer ${i + 1}… Use the toolbar to format text.`}
+                    />
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="nf-add-another"
+                onClick={() => setFormData(f => ({ ...f, answers: [...f.answers, { answer: "", is_very_good: false }] }))}
+              >
+                <IcoPlus /> Add another answer
+              </button>
+            </div>
+          </div>
+
+          <div className="nf-form-card-foot">
+            <div className="nf-foot-hint">
+              <kbd>Esc</kbd> to discard
+            </div>
+            <div className="nf-foot-actions">
+              <button type="button" className="nf-btn-cancel" onClick={cancelForm}>
+                <IcoX /> Discard
+              </button>
+              <button type="submit" className="nf-btn-save">
+                <span className="nf-sparkle">✦</span>
+                {editingNote ? "Save changes" : "Create note"}
+              </button>
+            </div>
+          </div>
+        </form>
       </div>
     );
   }
 
+  /* ══════════════════════════════════════════
+     LIST VIEW  (3-column)
+  ══════════════════════════════════════════ */
+  const allCats = ["All", ...categories];
+
   return (
-    <div className="notes-section">
+    <div className="notes-page">
       <ToastContainer />
-      <div className="section-header">
-        <div className="section-title">
-          <h2>📝 Notes</h2>
-          <p className="section-subtitle">
-            Organize your questions and answers by category
-          </p>
-        </div>
-        <div className="section-header-actions">
-          <div className="category-manager">
-            {showNewCategoryInput ? (
-              <div className="new-category-input">
-                <input
-                  type="text"
-                  placeholder="Category name (e.g., Python)"
-                  value={newCategoryName}
-                  onChange={e => setNewCategoryName(e.target.value)}
-                  onKeyPress={e => {
-                    if (e.key === "Enter") {
-                      handleAddCategory();
-                    } else if (e.key === "Escape") {
-                      setShowNewCategoryInput(false);
-                      setNewCategoryName("");
-                    }
-                  }}
-                  className="category-input"
-                  autoFocus
-                />
+      <div className="notes-3col">
+
+        {/* ── Sidebar ── */}
+        <aside className="notes-sidebar">
+          <div className="notes-sidebar-head">
+            <div className="notes-sidebar-title">Notes</div>
+            <div className="notes-search-box">
+              <IcoSearch />
+              <input
+                placeholder="Search…"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="notes-sidebar-cats">
+            <div className="notes-cat-label">Categories</div>
+            {allCats.map(cat => {
+              const val   = cat === "All" ? "" : cat;
+              const count = cat === "All" ? notes.length : notes.filter(n => n.category === cat).length;
+              return (
                 <button
-                  onClick={handleAddCategory}
-                  className="btn btn-small btn-primary"
+                  key={cat}
+                  className={`notes-cat-btn${selectedCategory === val ? " active" : ""}`}
+                  onClick={() => setSelectedCategory(val)}
                 >
-                  Add
+                  <span>{cat}</span>
+                  <span className="notes-cat-count">{count}</span>
                 </button>
-                <button
-                  onClick={() => {
-                    setShowNewCategoryInput(false);
-                    setNewCategoryName("");
-                  }}
-                  className="btn btn-small btn-secondary"
-                >
-                  Cancel
-                </button>
-              </div>
+              );
+            })}
+          </div>
+          <div className="notes-sidebar-foot">
+            <button className="notes-btn-new" onClick={startCreate}>
+              <IcoPlus /> New note
+            </button>
+          </div>
+        </aside>
+
+        {/* ── List pane ── */}
+        <div className="notes-list-pane">
+          <div className="notes-list-head">
+            <span className="notes-list-head-label">{selectedCategory || "All"}</span>
+            <span className="notes-list-head-count">{notes.length}</span>
+          </div>
+          <div className="notes-list-scroll thin-scroll">
+            {loading && notes.length === 0 ? (
+              <div className="notes-list-empty">Loading…</div>
+            ) : notes.length === 0 ? (
+              <div className="notes-list-empty">No notes found.</div>
             ) : (
-              <button
-                onClick={() => {
-                  setShowNewCategoryInput(true);
-                  setShowForm(true);
-                }}
-                className="btn btn-secondary btn-small"
-                title="Add New Category"
-              >
-                + Category
-              </button>
+              notes.map(note => {
+                const isActive = activeNote?.id === note.id;
+                return (
+                  <div
+                    key={note.id}
+                    className={`notes-row${isActive ? " active" : ""}`}
+                    onClick={() => setActiveNoteId(note.id)}
+                  >
+                    <div className="notes-row-cat">{note.category}</div>
+                    <div className="notes-row-q">{note.question}</div>
+                    <div className="notes-row-meta">
+                      <span>{fmtDate(note.created_at)}</span>
+                      <span className="notes-row-dot" />
+                      <span>{note.answers?.length ?? 0} ans</span>
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
-          <button
-            onClick={() => {
-              setShowForm(!showForm);
-              setEditingNote(null);
-              setFormData({ category: "", question: "", answer: "", answers: [{ answer: "", is_very_good: false }] });
-            }}
-            className="btn btn-primary btn-large"
-          >
-            + Add Note
-          </button>
-        </div>
-      </div>
-
-      {/* Filters and Search */}
-      <div className="notes-filters">
-        <div className="filter-group">
-          <label>
-            <span className="filter-icon">📁</span> Category
-          </label>
-          <select
-            value={selectedCategory}
-            onChange={e => setSelectedCategory(e.target.value)}
-            className="filter-select"
-          >
-            <option value="">All Categories</option>
-            {categories.map(cat => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
         </div>
 
-        <div className="filter-group filter-group-search">
-          <label>
-            <span className="filter-icon">🔍</span> Search
-          </label>
-          <input
-            type="text"
-            placeholder="Search questions or answers..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="filter-input"
-          />
-        </div>
-
-        <div className="filter-group">
-          <label>
-            <span className="filter-icon">📊</span> Limit
-          </label>
-          <select
-            value={limit}
-            onChange={e => setLimit(parseInt(e.target.value))}
-            className="filter-select"
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-            <option value={200}>200</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Form */}
-      {showForm && (
-        <form onSubmit={handleSubmit} className="note-form">
-          <div className="form-header">
-            <h3>
-              {editingNote ? "Edit Note" : "Add New Note"}
-            </h3>
-            <button
-              type="button"
-              onClick={() => {
-              setShowForm(false);
-              setEditingNote(null);
-              setFormData({ category: "", question: "", answer: "", answers: [{ answer: "", is_very_good: false }] });
-              setShowNewCategoryInput(false);
-              }}
-              className="btn-close-form"
-            >
-              &times;
-            </button>
-          </div>
-
-          <div className="form-group">
-            <label>
-              <span className="label-icon">📁</span> Category
-            </label>
-            <div className="category-selector">
-              <select
-                value={formData.category}
-                onChange={e =>
-                  setFormData({ ...formData, category: e.target.value })
-                }
-                className="form-select"
-                required
-              >
-                <option value="">Select Category</option>
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-              {!formData.category && (
-                <div className="category-help">
-                  <small>💡 Tip: Add a new category using "+ Category" button above</small>
-                </div>
-              )}
+        {/* ── Reading pane ── */}
+        <div className="notes-reading-pane">
+          {!displayedNote ? (
+            <div className="notes-reading-empty">
+              <IcoDoc />
+              <span>Select a note to read</span>
             </div>
-          </div>
-
-          <div className="form-group">
-            <label>
-              <span className="label-icon">❓</span> Question
-            </label>
-            <textarea
-              value={formData.question}
-              onChange={e =>
-                setFormData({ ...formData, question: e.target.value })
-              }
-              placeholder="Enter your question..."
-              required
-              rows={3}
-              className="form-textarea"
-            />
-          </div>
-
-          <div className="form-group">
-            <label>
-              <span className="label-icon">💬</span> Answers
-            </label>
-            <div className="editor-help">
-              <small>
-                💡 You can add multiple answers. Use toolbar buttons to format text (bold, italic, headings, lists, links)
-              </small>
-            </div>
-            {formData.answers.map((ans, index) => (
-              <div key={index} className="answer-item">
-                <div className="answer-item-header">
-                  <label className="answer-number">Answer {index + 1}</label>
-                  <div className="answer-item-actions">
-                    <label className="very-good-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={ans.is_very_good || false}
-                        onChange={e => {
-                          const newAnswers = [...formData.answers];
-                          newAnswers[index].is_very_good = e.target.checked;
-                          setFormData({ ...formData, answers: newAnswers });
-                        }}
-                      />
-                      <span className="checkmark">✓</span>
-                      <span className="very-good-label">Very Good</span>
-                    </label>
-                    {formData.answers.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newAnswers = formData.answers.filter((_, i) => i !== index);
-                          setFormData({ ...formData, answers: newAnswers.length > 0 ? newAnswers : [{ answer: "", is_very_good: false }] });
-                        }}
-                        className="btn-icon-small btn-icon-danger"
-                        title="Remove Answer"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <RichTextEditor
-                  value={ans.answer}
-                  onChange={answer => {
-                    const newAnswers = [...formData.answers];
-                    newAnswers[index].answer = answer;
-                    setFormData({ ...formData, answers: newAnswers });
-                  }}
-                  placeholder={`Enter answer ${index + 1}... Use toolbar to format text (bold, italic, lists, headings, links)`}
-                />
+          ) : (
+            <>
+              <div className="notes-reading-head">
+                <div className="notes-reading-cat">{displayedNote.category}</div>
+                <div className="notes-reading-question">{displayedNote.question}</div>
+                <div className="notes-reading-date">{fmtDate(displayedNote.created_at)}</div>
               </div>
-            ))}
-            <button
-              type="button"
-              onClick={() => {
-                setFormData({
-                  ...formData,
-                  answers: [...formData.answers, { answer: "", is_very_good: false }],
-                });
-              }}
-              className="btn btn-secondary btn-small"
-              style={{ marginTop: "0.5rem" }}
-            >
-              + Add Another Answer
-            </button>
-          </div>
 
-          <div className="form-actions">
-            <button type="submit" className="btn btn-primary btn-large">
-              {editingNote ? "💾 Update Note" : "✨ Create Note"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-              setShowForm(false);
-              setEditingNote(null);
-              setFormData({ category: "", question: "", answer: "", answers: [{ answer: "", is_very_good: false }] });
-              setShowNewCategoryInput(false);
-              }}
-              className="btn btn-secondary"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Notes List */}
-      {notes.length === 0 ? (
-        <div className="empty-notes">
-          <div className="empty-icon">📝</div>
-          <h3>No notes found</h3>
-          <p>
-            {selectedCategory
-              ? `No notes in "${selectedCategory}" category.`
-              : "Create your first note to get started!"}
-          </p>
-          <button
-            onClick={() => {
-              setShowForm(true);
-            }}
-            className="btn btn-primary"
-          >
-            + Add Your First Note
-          </button>
-        </div>
-      ) : (
-        <div className="notes-list">
-          {notes
-            .filter(note => editingNote?.id !== note.id) // Hide note being edited
-            .map((note, index) => {
-            return (
-              <div key={note.id} className="note-card" onClick={() => openModal(note)} style={{ cursor: "pointer" }}>
-                <div className="note-header">
-                  <div className="note-category-badge">
-                    <span className="category-icon-small">📁</span>
-                    {note.category}
+              <div className="notes-answers-section">
+                <div className="notes-section-rule">
+                  <div className="notes-rule-line" />
+                  <div className="notes-rule-label">
+                    Answers · {displayedNote.answers?.length ?? 0}
                   </div>
-                  <div className="note-actions">
-                    <button
-                      onClick={e => { e.stopPropagation(); handleEdit(note); }}
-                      className="btn-icon-small"
-                      title="Edit"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      onClick={e => { e.stopPropagation(); handleDelete(note.id); }}
-                      className="btn-icon-small btn-icon-danger"
-                      title="Delete"
-                    >
-                      🗑️
-                    </button>
-                  </div>
+                  <div className="notes-rule-line" />
                 </div>
+              </div>
 
-                <div className="note-question">
-                  <span className="question-label">Q:</span>
-                  <span className="question-text">{note.question}</span>
-                </div>
-
-                {/* Answers — always clamped, modal opens for full view */}
-                <div className="note-answers-list">
-                  {note.answers && note.answers.length > 0 ? (
-                    note.answers.map((ans, ansIndex) => (
-                      <div key={ans.id || ansIndex} className={`note-answer${ans.is_very_good ? " very-good-answer" : ""}`}>
-                        <div className="answer-header">
-                          <span className="answer-label">A{note.answers.length > 1 ? ` ${ansIndex + 1}` : ""}:</span>
-                          {ans.is_very_good && (
-                            <span className="very-good-badge" title="Very Good Answer">
-                              ✓ Very Good
-                            </span>
-                          )}
-                        </div>
-                        <div className="answer-text answer-clamped">
-                          {renderAnswer(ans.answer)}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="note-answer">
-                      <div className="answer-text answer-clamped">
-                        {renderAnswer(note.answer || "")}
-                      </div>
+              <div className="notes-reading-scroll thin-scroll">
+                {(displayedNote.answers?.length > 0
+                  ? [...displayedNote.answers].sort((a, b) => {
+                      if (a.is_very_good && !b.is_very_good) return -1;
+                      if (!a.is_very_good && b.is_very_good) return 1;
+                      return (a.display_order || 0) - (b.display_order || 0);
+                    })
+                  : displayedNote.answer
+                    ? [{ id: "legacy", answer: displayedNote.answer, is_very_good: false }]
+                    : []
+                ).map((ans, i) => (
+                  <div key={ans.id ?? i} className={`notes-answer-card${ans.is_very_good ? " very-good" : ""}`}>
+                    <div className="notes-answer-num">
+                      Answer {i + 1}
+                      {ans.is_very_good && <span className="notes-vg-badge"> · Very good</span>}
                     </div>
-                  )}
-                  <button onClick={e => { e.stopPropagation(); openModal(note); }} className="btn btn-link btn-see-more">
-                    See More →
-                  </button>
-                </div>
-
-                <div className="note-footer">
-                  <small className="note-date">
-                    📅 Created: {new Date(note.created_at).toLocaleString('en-US', { 
-                      year: 'numeric', 
-                      month: 'short', 
-                      day: 'numeric', 
-                      hour: 'numeric', 
-                      minute: '2-digit',
-                      hour12: true 
-                    })}
-                  </small>
-                  {note.updated_at !== note.created_at && (
-                    <small className="note-updated">
-                      ✏️ Updated: {new Date(note.updated_at).toLocaleString('en-US', { 
-                        year: 'numeric', 
-                        month: 'short', 
-                        day: 'numeric', 
-                        hour: 'numeric', 
-                        minute: '2-digit',
-                        hour12: true 
-                      })}
-                    </small>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Modal for Full Note View */}
-      {modalNote && (
-        <div className="modal-overlay fade-in" onClick={closeModal}>
-          <div
-            className="modal-content modal-large"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="modal-header">
-              <h2>Note Details</h2>
-              <button className="close-btn" onClick={closeModal}>
-                &times;
-              </button>
-            </div>
-
-            <div className="modal-body">
-              <div className="modal-note-category">
-                <span className="category-icon-small">📁</span>
-                {modalNote.category}
-              </div>
-
-              <div className="modal-note-question">
-                <h3>
-                  <span className="question-label">Q:</span> {modalNote.question}
-                </h3>
-              </div>
-
-              <div className="modal-note-answer">
-                <h3>Answers:</h3>
-                {modalNote.answers && modalNote.answers.length > 0 ? (
-                  <div className="modal-answers-list">
-                    {/* Sort answers: very good ones first, then by display_order */}
-                    {[...modalNote.answers]
-                      .sort((a, b) => {
-                        // Very good answers first
-                        if (a.is_very_good && !b.is_very_good) return -1;
-                        if (!a.is_very_good && b.is_very_good) return 1;
-                        // Then by display_order
-                        if (a.display_order !== b.display_order) {
-                          return (a.display_order || 0) - (b.display_order || 0);
-                        }
-                        // Finally by created_at
-                        return new Date(a.created_at) - new Date(b.created_at);
-                      })
-                      .map((ans, ansIndex) => (
-                        <div key={ans.id || ansIndex} className={`modal-answer-item ${ans.is_very_good ? 'very-good-answer' : ''}`}>
-                          <div className="answer-header">
-                            <span className="answer-label">Answer {ansIndex + 1}:</span>
-                            {ans.is_very_good && (
-                              <span className="very-good-badge" title="Very Good Answer">
-                                ✓ Very Good
-                              </span>
-                            )}
-                          </div>
-                          <div className="answer-content-full">
-                            {renderAnswer(ans.answer)}
-                          </div>
-                        </div>
-                      ))}
+                    <div
+                      className="notes-answer-body answer-content-full"
+                      dangerouslySetInnerHTML={{ __html: sanitize(ans.answer) }}
+                    />
                   </div>
-                ) : (
-                  <div className="answer-content-full">
-                    {renderAnswer(modalNote.answer || "")}
-                  </div>
+                ))}
+                {!displayedNote.answers?.length && !displayedNote.answer && (
+                  <p style={{ color: "var(--fg-faint)", fontSize: 13 }}>No answers yet.</p>
                 )}
               </div>
 
-              <div className="modal-note-footer">
-                <small>
-                  📅 Created:{" "}
-                  {new Date(modalNote.created_at).toLocaleString('en-US', { 
-                    year: 'numeric', 
-                    month: 'short', 
-                    day: 'numeric', 
-                    hour: 'numeric', 
-                    minute: '2-digit',
-                    hour12: true 
-                  })}
-                </small>
-                {modalNote.updated_at !== modalNote.created_at && (
-                  <small>
-                    ✏️ Updated:{" "}
-                    {new Date(modalNote.updated_at).toLocaleString('en-US', { 
-                      year: 'numeric', 
-                      month: 'short', 
-                      day: 'numeric', 
-                      hour: 'numeric', 
-                      minute: '2-digit',
-                      hour12: true 
-                    })}
-                  </small>
-                )}
-              </div>
-
-              <div className="modal-actions">
-                <button
-                  onClick={() => {
-                    closeModal();
-                    handleEdit(modalNote);
-                  }}
-                  className="btn btn-primary"
-                >
-                  ✏️ Edit Note
+              <div className="notes-reading-toolbar">
+                <button className="notes-tb-btn" onClick={() => startEdit(displayedNote)}>
+                  <IcoEdit /> Edit
                 </button>
-                <button
-                  onClick={() => {
-                    closeModal();
-                    handleDelete(modalNote.id);
-                  }}
-                  className="btn btn-danger"
-                >
-                  🗑️ Delete Note
+                <button className="notes-tb-btn notes-tb-btn-danger" onClick={() => handleDelete(displayedNote.id)}>
+                  <IcoTrash /> Delete
                 </button>
+                <div style={{ flex: 1 }} />
+                <span className="notes-reading-ts">
+                  {displayedNote.updated_at && displayedNote.updated_at !== displayedNote.created_at
+                    ? `Edited ${fmtDate(displayedNote.updated_at)}`
+                    : `Created ${fmtDate(displayedNote.created_at)}`
+                  }
+                </span>
               </div>
-            </div>
-          </div>
+            </>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

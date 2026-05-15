@@ -184,7 +184,7 @@ function NotesPanel({ bookId, currentPage, onClose, authHeaders }) {
   return (
     <div
       style={{ width: panelWidth }}
-      className="shrink-0 bg-surface border border-edge rounded-2xl flex flex-col max-h-[calc(100vh-180px)] sticky top-20 animate-slide-right overflow-hidden relative"
+      className="notes-side kit-notes-side shrink-0 bg-surface border border-edge rounded-2xl flex flex-col max-h-[calc(100vh-180px)] sticky top-20 animate-slide-right overflow-hidden relative"
     >
       {/* Left-edge resize handle */}
       <div
@@ -590,34 +590,102 @@ function Books() {
   // ── LIBRARY VIEW ────────────────────────────────────────────────────────────
   if (view === "library") {
     const goalPct = Math.min(100, Math.round((pagesToday / dailyGoal) * 100));
+    const continueBook = books.find(
+      (b) => b.total_pages > 0 && (b.current_page || 1) < b.total_pages
+    ) || books[0];
     return (
-      <div className="books-section">
-        <div className="books-header">
-          <div>
-            <h2 className="books-title">📚 My Books</h2>
-            <p className="books-subtitle">Upload PDFs, read, and track your progress</p>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <div className="reading-goal-bar-wrap">
-              <span className="reading-goal-label">Today: {pagesToday} / {dailyGoal} pages</span>
-              <div className="reading-goal-track">
-                <div className="reading-goal-fill" style={{ width: `${goalPct}%` }} />
+      <div className="books-page">
+        <div className="books-lib-hero">
+          <div className="books-lib-hero-inner">
+            <div className="books-lib-hero-left">
+              <h1 className="books-lib-title">My Books</h1>
+              <p className="books-lib-tagline">Upload PDFs, read, and track your progress</p>
+              <div className="books-lib-stats-row">
+                <div className="books-lib-stat">
+                  <span className="books-lib-stat-val">{books.length}</span>
+                  <span className="books-lib-stat-label">In library</span>
+                </div>
+                <div className="books-lib-stat-div" aria-hidden />
+                <div className="books-lib-stat">
+                  <span className="books-lib-stat-val">
+                    {pagesToday} / {dailyGoal}
+                  </span>
+                  <span className="books-lib-stat-label">Pages today</span>
+                </div>
+                <div className="books-lib-stat-div" aria-hidden />
+                <div className="reading-goal-bar-wrap books-lib-goal">
+                  <span className="reading-goal-label">Daily goal</span>
+                  <div className="reading-goal-track">
+                    <div className="reading-goal-fill" style={{ width: `${goalPct}%` }} />
+                  </div>
+                  <button
+                    type="button"
+                    className="reading-goal-edit"
+                    title="Set daily goal"
+                    onClick={async () => {
+                      const v = prompt("Daily reading goal (pages):", dailyGoal);
+                      if (!v || isNaN(v)) return;
+                      setDailyGoal(parseInt(v));
+                      await fetch(`${API}/books/reading-goal`, {
+                        method: "PUT",
+                        headers: { ...authHeaders(), "Content-Type": "application/json" },
+                        body: JSON.stringify({ daily_pages_goal: parseInt(v) }),
+                      });
+                    }}
+                  >
+                    ✎
+                  </button>
+                </div>
               </div>
-              <button className="reading-goal-edit" title="Set daily goal"
-                onClick={async () => {
-                  const v = prompt("Daily reading goal (pages):", dailyGoal);
-                  if (!v || isNaN(v)) return;
-                  setDailyGoal(parseInt(v));
-                  await fetch(`${API}/books/reading-goal`, {
-                    method: "PUT",
-                    headers: { ...authHeaders(), "Content-Type": "application/json" },
-                    body: JSON.stringify({ daily_pages_goal: parseInt(v) }),
-                  });
-                }}>✎</button>
             </div>
-            <button className="btn btn-primary" onClick={() => setShowUpload(true)}>+ Upload Book</button>
+            <div className="books-lib-hero-right">
+              <button type="button" className="books-btn-upload" onClick={() => setShowUpload(true)}>
+                + Upload Book
+              </button>
+            </div>
           </div>
         </div>
+
+        {continueBook && books.length > 0 && (
+          <div className="books-current-wrap">
+            <div className="section-label">Continue reading</div>
+            <button
+              type="button"
+              className="books-cr-card"
+              onClick={() => openBook(continueBook)}
+            >
+              <div className="books-cr-cover">
+                {continueBook.cover_data ? (
+                  <img src={continueBook.cover_data} alt="" />
+                ) : (
+                  <div className="books-cr-cover-placeholder" aria-hidden>
+                    <span className="books-cr-spine" />
+                    <span className="books-cr-shimmer" />
+                    <span className="books-cr-mini-title">{continueBook.title}</span>
+                  </div>
+                )}
+              </div>
+              <div className="books-cr-info">
+                <div className="books-cr-title">{continueBook.title}</div>
+                <div className="books-cr-meta">
+                  {continueBook.total_pages > 0
+                    ? `p.${continueBook.current_page || 1} / ${continueBook.total_pages} · ${pctRead(continueBook)}%`
+                    : `p.${continueBook.current_page || 1}`}
+                </div>
+                <div className="books-cr-prog-wrap">
+                  <div className="books-cr-prog-bar">
+                    <div
+                      className="books-cr-prog-fill"
+                      style={{ width: `${pctRead(continueBook)}%` }}
+                    />
+                  </div>
+                  <span className="books-cr-pct">{pctRead(continueBook)}%</span>
+                </div>
+              </div>
+              <span className="books-cr-open">Open →</span>
+            </button>
+          </div>
+        )}
 
         {showUpload && (
           <div className="modal-overlay" onClick={() => setShowUpload(false)}>
@@ -675,34 +743,53 @@ function Books() {
             </button>
           </div>
         ) : (
-          <div className="book-grid">
-            {books.map(book => (
-              <div key={book.id} className="book-card" onClick={() => openBook(book)}>
-                <div className="book-cover">
-                  {book.cover_data
-                    ? <img src={book.cover_data} alt={book.title} />
-                    : <div className="book-cover-initial">{book.title.charAt(0).toUpperCase()}</div>
-                  }
-                </div>
-                <div className="book-info">
-                  <div className="book-card-title">{book.title}</div>
-                  {book.author && <div className="book-card-author">{book.author}</div>}
-                  <div className="book-card-progress">
-                    <div className="book-progress-track">
-                      <div className="book-progress-fill" style={{ width: `${pctRead(book)}%` }} />
-                    </div>
-                    <span className="book-progress-label">
+          <div className="books-all">
+            <div className="section-label">All books</div>
+            <div className="book-grid kit-book-grid">
+              {books.map((book) => (
+                <div key={book.id} className="book-card kit-book-card" onClick={() => openBook(book)}>
+                  <div className="book-cover-3d">
+                    {book.cover_data ? (
+                      <div className="bk-inner bk-inner--img">
+                        <img src={book.cover_data} alt="" className="kit-book-cover-img" />
+                      </div>
+                    ) : (
+                      <div className="bk-inner bk-inner--placeholder">
+                        <span className="bk-spine" aria-hidden />
+                        <span className="bk-shimmer" aria-hidden />
+                        <span className="bk-name">{book.title}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="book-meta-row kit-book-meta-row">
+                    <div className="book-meta-title">{book.title}</div>
+                    {book.author && <div className="book-meta-author">{book.author}</div>}
+                    <div className="book-meta-sub">
                       {book.total_pages > 0
                         ? `p.${book.current_page} / ${book.total_pages} · ${pctRead(book)}%`
                         : `p.${book.current_page}`}
-                    </span>
+                    </div>
+                    <div className="bk-prog">
+                      <div
+                        className="bk-prog-fill"
+                        style={{ width: `${pctRead(book)}%` }}
+                      />
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    className="book-delete-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(book.id);
+                    }}
+                    title="Delete book"
+                  >
+                    🗑
+                  </button>
                 </div>
-                <button className="book-delete-btn"
-                  onClick={e => { e.stopPropagation(); handleDelete(book.id); }}
-                  title="Delete book">🗑</button>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -712,20 +799,30 @@ function Books() {
   // ── READER VIEW ─────────────────────────────────────────────────────────────
   return (
     <div
-      className={`book-reader${fullscreen ? " book-reader--fullscreen" : ""}`}
+      className={`book-reader kit-reader${fullscreen ? " book-reader--fullscreen" : ""}`}
       ref={containerRef}
       onMouseUp={handleMouseUp}
     >
-      {/* Top bar */}
-      <div className="book-reader-bar">
-        <button className="book-back-btn" onClick={() => { setView("library"); setSelectedBook(null); }}>
+      {/* Top bar — Book.html reader-bar */}
+      <div className="book-reader-bar kit-reader-bar">
+        <button
+          type="button"
+          className="book-back-btn kit-r-back"
+          onClick={() => {
+            setView("library");
+            setSelectedBook(null);
+          }}
+        >
           ← Library
         </button>
-        <div className="book-reader-title">
-          <span>{selectedBook?.title}</span>
-          {selectedBook?.author && <span className="book-reader-author">by {selectedBook.author}</span>}
+        <span className="kit-r-sep" aria-hidden />
+        <div className="book-reader-title kit-r-title-wrap">
+          <span className="kit-r-title-strong">{selectedBook?.title}</span>
+          {selectedBook?.author && (
+            <span className="book-reader-author kit-r-title-sub">by {selectedBook.author}</span>
+          )}
         </div>
-        <div className="book-reader-controls">
+        <div className="book-reader-controls kit-r-controls">
           {/* Favourite pages picker */}
           <div className="relative" style={{ position: "relative" }}>
             <button
@@ -843,9 +940,9 @@ function Books() {
         </div>
       </div>
 
-      <div className="book-reader-body">
+      <div className="book-reader-body kit-reader-body">
         {/* PDF canvas */}
-        <div className="book-pdf-area">
+        <div className="book-pdf-area kit-pdf-pane">
           <Document
             file={pdfFile}
             onLoadSuccess={({ numPages: n }) => {
@@ -871,7 +968,7 @@ function Books() {
 
         {/* Highlights panel */}
         {showHighlights && (
-          <div className="highlights-panel">
+          <div className="highlights-panel kit-highlights-side">
             <div className="highlights-panel-header">
               <span>✏ Highlights ({highlights.length})</span>
               <button className="close-btn" onClick={() => setShowHighlights(false)}>×</button>

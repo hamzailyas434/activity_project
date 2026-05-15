@@ -1,7 +1,9 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const speakeasy = require("speakeasy");
 const db = require("../config/database");
 const { JWT_SECRET } = require("../middleware/auth");
+const { issueTokens } = require("./tokenController");
 const { isStrongPassword, msg: pwMsg } = require("../utils/passwordPolicy");
 
 // Register new user
@@ -180,6 +182,10 @@ exports.loginVerify2FA = async (req, res) => {
     if (users.length === 0) return res.status(401).json({ error: "User not found" });
     const user = users[0];
 
+    if (!user.totp_enabled || !user.totp_secret) {
+      return res.status(401).json({ error: "2FA is not configured for this account" });
+    }
+
     const speakeasy = require("speakeasy");
     const valid = speakeasy.totp.verify({
       secret: user.totp_secret,
@@ -189,8 +195,9 @@ exports.loginVerify2FA = async (req, res) => {
     });
     if (!valid) return res.status(401).json({ error: "Invalid 2FA code" });
 
-    const { issueTokens } = require("./tokenController");
-    await issueTokens(user, res, req.ip, req.headers["user-agent"]);
+    // Use safe projection — never pass the full DB row
+    const safeUser = { id: user.id, username: user.username, email: user.email };
+    await issueTokens(safeUser, res, req.ip, req.headers["user-agent"]);
   } catch (error) {
     console.error("2FA verify error:", error);
     res.status(500).json({ error: "2FA verification failed" });
@@ -201,12 +208,15 @@ exports.loginVerify2FA = async (req, res) => {
 exports.logout = async (req, res) => {
   const rawRefresh = req.cookies?.refreshToken;
   if (rawRefresh) {
-    const crypto = require("crypto");
-    const hash = crypto.createHash("sha256").update(rawRefresh).digest("hex");
-    await db.query(
-      "UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = ? AND revoked_at IS NULL",
-      [hash]
-    ).catch(() => {});
+    const hash = require("crypto").createHash("sha256").update(rawRefresh).digest("hex");
+    try {
+      await db.query(
+        "UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = ? AND revoked_at IS NULL",
+        [hash]
+      );
+    } catch (err) {
+      console.error("Failed to revoke refresh token on logout:", err.message);
+    }
   }
   res.clearCookie("authToken",     { httpOnly: true, sameSite: "strict" });
   res.clearCookie("refreshToken",  { httpOnly: true, sameSite: "strict", path: "/api/users/refresh" });
@@ -258,7 +268,6 @@ exports.updateProfile = async (req, res) => {
         [username.trim(), userId]
       );
       if (existingUsername.length > 0) {
-        console.log("Username already exists:", existingUsername);
         return res.status(400).json({ 
           error: "Username already in use",
           details: `The username '${username.trim()}' is already taken by another user`

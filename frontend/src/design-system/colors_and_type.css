@@ -1,0 +1,368 @@
+/* ============================================================
+   Rhythm — Design Tokens (Fog & Ink · cool-neutral edition)
+   Fonts: load via index.html <link> (avoid @import order issues in bundled CSS).
+   ============================================================ */
+
+:root {
+  /* ---------- Color primitives (cool fog neutrals · hue ~230°) ---------- */
+  --fog-50:  #F5F7FA;
+  --fog-100: #EAEEF3;
+  --fog-200: #D6DCE5;
+  --fog-300: #B3BCCA;
+  --fog-400: #7E8A9C;
+  --fog-500: #515C6E;
+  --fog-600: #384252;
+  --fog-700: #232B37;
+  --fog-800: #161C26;
+  --fog-850: #0F131B90; /* for glass overlays */
+  --fog-900: #0D1118;
+  --fog-950: #06080C;
+
+  /* Legacy aliases — keep old --warm-* refs working across kits */
+  --warm-50:  var(--fog-50);
+  --warm-100: var(--fog-100);
+  --warm-200: var(--fog-200);
+  --warm-300: var(--fog-300);
+  --warm-400: var(--fog-400);
+  --warm-500: var(--fog-500);
+  --warm-600: var(--fog-600);
+  --warm-700: var(--fog-700);
+  --warm-800: var(--fog-800);
+  --warm-850: var(--fog-850);
+  --warm-900: var(--fog-900);
+  --warm-950: var(--fog-950);
+
+  /* ---------- Accent: Teal-Slate (primary) -------------------
+     Harmonizes with fog neutrals — sits inside the family,
+     doesn't punch out. Replaces warm indigo.               */
+  --teal-50:   #E6EFF2;
+  --teal-100:  #CFDEE4;
+  --teal-200:  #A8C2CC;
+  --teal-300:  #7FA7B5;
+  --teal-400:  #5F8E9E;
+  --teal-500:  #4F7F91;
+  --teal-600:  #3F6B7A;  /* brand anchor */
+  --teal-700:  #2F5260;
+  --teal-800:  #233E49;
+  --teal-900:  #172A32;
+
+  /* Indigo aliases — legacy refs still resolve to teal */
+  --indigo-50:  var(--teal-50);
+  --indigo-100: var(--teal-100);
+  --indigo-200: var(--teal-200);
+  --indigo-300: var(--teal-300);
+  --indigo-400: var(--teal-400);
+  --indigo-500: var(--teal-500);
+  --indigo-600: var(--teal-600);
+  --indigo-700: var(--teal-700);
+  --indigo-800: var(--teal-800);
+  --indigo-900: var(--teal-900);
+
+  /* ---------- Iris (secondary · reflective modules) -----------
+     Replaces plum. Desaturated, matched chroma.          */
+  --iris-50:   #F1EEF9;
+  --iris-200:  #CFC5E7;
+  --iris-400:  #A08FCD;
+  --iris-600:  #7E6AB8;
+  --iris-800:  #4F3E84;
+
+  /* legacy plum aliases */
+  --plum-50:  var(--iris-50);
+  --plum-200: var(--iris-200);
+  --plum-400: var(--iris-400);
+  --plum-600: var(--iris-600);
+  --plum-800: var(--iris-800);
+
+  /* ---------- Mineral (completion / positive) ----------------
+     Replaces sage — cool mineral green.                   */
+  --mineral-50:  #EAF1EE;
+  --mineral-100: #D1E0DA;
+  --mineral-200: #A8C3B9;
+  --mineral-300: #82AB9E;
+  --mineral-400: #6B9D8E;
+  --mineral-500: #5B9487;
+  --mineral-600: #46766C;
+  --mineral-700: #355B53;
+
+  /* legacy sage aliases */
+  --sage-50:  var(--mineral-50);
+  --sage-100: var(--mineral-100);
+  --sage-200: var(--mineral-200);
+  --sage-300: var(--mineral-300);
+  --sage-400: var(--mineral-400);
+  --sage-500: var(--mineral-500);
+  --sage-600: var(--mineral-600);
+  --sage-700: var(--mineral-700);
+
+  /* ---------- Ochre (attention / missed) ---------------------
+     Replaces amber — cooled, desaturated.                 */
+  --ochre-100: #F2E4CE;
+  --ochre-300: #DDB079;
+  --ochre-500: #C08547;
+  --ochre-700: #8A5C2C;
+
+  /* legacy amber aliases */
+  --amber-100: var(--ochre-100);
+  --amber-300: var(--ochre-300);
+  --amber-500: var(--ochre-500);
+  --amber-700: var(--ochre-700);
+
+  /* ---------- Dusk clay (favourites / stickies) --------------
+     Replaces clay — cooled, shifted toward dusk.          */
+  --dusk-100: #EDD9D1;
+  --dusk-300: #C99684;
+  --dusk-500: #A86A5A;
+  --dusk-700: #764638;
+
+  /* legacy clay aliases */
+  --clay-100: var(--dusk-100);
+  --clay-300: var(--dusk-300);
+  --clay-500: var(--dusk-500);
+  --clay-700: var(--dusk-700);
+
+  /* ---------- Sticky note palette (cool-shifted) ---------- */
+  --sticky-straw:  #EDE3B4;  /* cooled yellow */
+  --sticky-blush:  #E8CBD4;  /* cooled pink */
+  --sticky-sky:    #CBD9E4;  /* cooled blue */
+  --sticky-moss:   #C4DCCB;  /* cooled green */
+  --sticky-lilac:  #D7D0E6;  /* cooled lilac */
+
+  /* legacy sticky aliases */
+  --sticky-yellow: var(--sticky-straw);
+  --sticky-pink:   var(--sticky-blush);
+  --sticky-blue:   var(--sticky-sky);
+  --sticky-green:  var(--sticky-moss);
+
+  /* ---------- Typography families ---------- */
+  --font-display: 'Newsreader', ui-serif, Georgia, serif;
+  --font-sans:    'Geist', ui-sans-serif, system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono:    'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* ---------- Type scale (slightly compact for app UI density) ---------- */
+  --text-xs:   10px;
+  --text-sm:   12px;
+  --text-base: 14px;
+  --text-md:   16px;
+  --text-lg:   18px;
+  --text-xl:   22px;
+  --text-2xl:  28px;
+  --text-3xl:  34px;
+  --text-4xl:  42px;
+  --text-5xl:  56px;
+
+  --lh-tight:  1.15;
+  --lh-snug:   1.3;
+  --lh-normal: 1.5;
+  --lh-loose:  1.7;
+
+  --ls-tight:  -0.02em;
+  --ls-normal: 0em;
+  --ls-wide:   0.04em;
+  --ls-caps:   0.08em;
+
+  /* ---------- Spacing (4px base) ---------- */
+  --space-0:  0px;
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-7:  32px;
+  --space-8:  40px;
+  --space-9:  56px;
+  --space-10: 72px;
+  --space-11: 96px;
+
+  /* ---------- Radii ---------- */
+  --r-sm:   6px;
+  --r-md:   10px;
+  --r-lg:   16px;
+  --r-xl:   20px;
+  --r-2xl:  28px;
+  --r-full: 999px;
+
+  /* ---------- Motion ---------- */
+  --ease:       cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in:    cubic-bezier(0.4, 0, 1, 1);
+  --dur-fast:   120ms;
+  --dur:        200ms;
+  --dur-slow:   320ms;
+}
+
+/* ============================================================
+   Semantic tokens — LIGHT (default)
+   ============================================================ */
+:root {
+  --bg:              var(--fog-50);
+  --bg-raised:       #FFFFFF;
+  --bg-raised-hover: var(--fog-100);
+  --bg-sunken:       var(--fog-100);
+  --bg-inverse:      var(--fog-900);
+
+  --fg:              var(--fog-900);
+  --fg-muted:        var(--fog-600);
+  --fg-subtle:       var(--fog-500);
+  --fg-faint:        var(--fog-400);
+  --fg-inverse:      var(--fog-50);
+
+  --border:          var(--fog-200);
+  --border-strong:   var(--fog-300);
+  --border-faint:    var(--fog-100);
+
+  --accent:          var(--teal-600);
+  --accent-hover:    var(--teal-700);
+  --accent-weak:     var(--teal-50);
+  --accent-fg:       #FFFFFF;
+
+  --success:         var(--mineral-600);
+  --success-weak:    var(--mineral-50);
+  --warning:         var(--ochre-500);
+  --warning-weak:    var(--ochre-100);
+  --danger:          #A9442E;
+  --danger-weak:     #F2DCD4;
+
+  --shadow-sm:  0 1px 2px rgb(13 17 24 / 0.04), 0 1px 1px rgb(13 17 24 / 0.03);
+  --shadow-md:  0 4px 14px rgb(13 17 24 / 0.06), 0 1px 3px rgb(13 17 24 / 0.04);
+  --shadow-lg:  0 16px 40px rgb(13 17 24 / 0.08), 0 4px 10px rgb(13 17 24 / 0.04);
+  --shadow-inset-hi: inset 0 1px 0 rgb(255 255 255 / 0.8);
+
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px rgb(63 107 122 / 0.45);
+
+  --glass-bg:      rgb(255 255 255 / 0.72);
+  --glass-border:  rgb(255 255 255 / 0.6);
+  --glass-blur:    blur(20px) saturate(140%);
+
+  --modal-backdrop:        color-mix(in srgb, var(--fog-950) 38%, transparent);
+  --modal-backdrop-blur:   blur(14px) saturate(130%);
+  --modal-surface-glow:    color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+/* ============================================================
+   Semantic tokens — DARK
+   ============================================================ */
+:root[data-theme="dark"],
+.dark {
+  --bg:              var(--fog-950);
+  --bg-raised:       var(--fog-900);
+  --bg-raised-hover: var(--fog-800);
+  --bg-sunken:       #04060A;
+  --bg-inverse:      var(--fog-50);
+
+  --fg:              var(--fog-50);
+  --fg-muted:        var(--fog-300);
+  --fg-subtle:       var(--fog-400);
+  --fg-faint:        var(--fog-500);
+  --fg-inverse:      var(--fog-900);
+
+  --border:          #232B37;
+  --border-strong:   #313A48;
+  --border-faint:    #1A202A;
+
+  --accent:          var(--teal-500);
+  --accent-hover:    var(--teal-400);
+  --accent-weak:     #1E333C;
+  --accent-fg:       #FFFFFF;
+
+  --success:         var(--mineral-400);
+  --success-weak:    #1C2E29;
+  --warning:         var(--ochre-300);
+  --warning-weak:    #322614;
+  --danger:          #E08570;
+  --danger-weak:     #3A1F18;
+
+  --shadow-sm:  0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-md:  0 4px 14px rgb(0 0 0 / 0.35), 0 1px 3px rgb(0 0 0 / 0.25);
+  --shadow-lg:  0 16px 40px rgb(0 0 0 / 0.45);
+  --shadow-inset-hi: inset 0 1px 0 rgb(255 255 255 / 0.04);
+
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px rgb(79 127 145 / 0.55);
+
+  --glass-bg:      rgb(15 19 27 / 0.58);
+  --glass-border:  rgb(255 255 255 / 0.06);
+  --glass-blur:    blur(20px) saturate(140%);
+
+  --modal-backdrop:        color-mix(in srgb, #000000 62%, transparent);
+  --modal-backdrop-blur:   blur(16px) saturate(125%);
+  --modal-surface-glow:    color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* ============================================================
+   Element base styles — semantic
+   ============================================================ */
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--lh-normal);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'ss01', 'cv11';
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-tight);
+  margin: 0;
+  color: var(--fg);
+}
+h1 { font-size: var(--text-4xl); font-weight: 500; }
+h2 { font-size: var(--text-3xl); }
+h3 { font-size: var(--text-2xl); }
+h4 { font-size: var(--text-xl); }
+h5 { font-size: var(--text-lg); }
+h6 { font-size: var(--text-md); letter-spacing: var(--ls-caps); text-transform: uppercase; font-family: var(--font-sans); font-weight: 600; }
+
+p  { margin: 0; line-height: var(--lh-normal); color: var(--fg); }
+small, .text-sm { font-size: var(--text-sm); color: var(--fg-muted); }
+.text-xs { font-size: var(--text-xs); letter-spacing: var(--ls-wide); }
+
+code, kbd, pre, .mono {
+  font-family: var(--font-mono);
+  font-feature-settings: 'tnum', 'zero';
+  font-size: 0.95em;
+}
+
+.num, .tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* Links */
+a {
+  color: var(--accent);
+  text-decoration: none;
+  text-underline-offset: 2px;
+  transition: color var(--dur-fast) var(--ease);
+}
+a:hover { text-decoration: underline; }
+
+/* Focus */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--r-sm);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: var(--r-full); }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* Utility: card, glass */
+.card {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+}
+.card--glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-md), var(--shadow-inset-hi);
+}

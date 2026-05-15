@@ -1,8 +1,34 @@
 const db = require("../config/database");
 
+/** Ensures migration for remaining_sent_home (avoids 500 if manual migration was not run). */
+let ensureBudgetColumnPromise = null;
+function ensureExpenseBudgetRemainingColumn() {
+  if (!ensureBudgetColumnPromise) {
+    ensureBudgetColumnPromise = (async () => {
+      const [rows] = await db.query(
+        `SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'expense_budgets' AND COLUMN_NAME = 'remaining_sent_home'`
+      );
+      if (Number(rows[0].c) > 0) return;
+      try {
+        await db.query(
+          `ALTER TABLE expense_budgets ADD COLUMN remaining_sent_home TINYINT(1) NOT NULL DEFAULT 0`
+        );
+      } catch (e) {
+        if (e.errno !== 1060) throw e;
+      }
+    })().catch((err) => {
+      ensureBudgetColumnPromise = null;
+      throw err;
+    });
+  }
+  return ensureBudgetColumnPromise;
+}
+
 // GET /api/expenses/budget?month=&year=
 exports.getBudget = async (req, res) => {
   try {
+    await ensureExpenseBudgetRemainingColumn();
     const userId = req.user.id;
     const { month, year } = req.query;
 
@@ -10,7 +36,14 @@ exports.getBudget = async (req, res) => {
       "SELECT * FROM expense_budgets WHERE user_id = ? AND month = ? AND year = ?",
       [userId, month, year]
     );
-    res.json(rows[0] || { total_income: 0 });
+    const row = rows[0];
+    if (!row) {
+      return res.json({ total_income: 0, remaining_sent_home: false });
+    }
+    res.json({
+      ...row,
+      remaining_sent_home: Boolean(row.remaining_sent_home),
+    });
   } catch (error) {
     console.error("Error fetching budget:", error);
     res.status(500).json({ error: "Failed to fetch budget" });
@@ -20,21 +53,29 @@ exports.getBudget = async (req, res) => {
 // POST /api/expenses/budget
 exports.upsertBudget = async (req, res) => {
   try {
+    await ensureExpenseBudgetRemainingColumn();
     const userId = req.user.id;
     const { month, year, total_income } = req.body;
+    const rawFlag = req.body.remaining_sent_home;
+    const remainingSentHome =
+      rawFlag === true || rawFlag === 1 || rawFlag === "1" || rawFlag === "true" ? 1 : 0;
 
     await db.query(
-      `INSERT INTO expense_budgets (user_id, month, year, total_income)
-       VALUES (?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE total_income = ?`,
-      [userId, month, year, total_income, total_income]
+      `INSERT INTO expense_budgets (user_id, month, year, total_income, remaining_sent_home)
+       VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE total_income = ?, remaining_sent_home = ?`,
+      [userId, month, year, total_income, remainingSentHome, total_income, remainingSentHome]
     );
 
     const [rows] = await db.query(
       "SELECT * FROM expense_budgets WHERE user_id = ? AND month = ? AND year = ?",
       [userId, month, year]
     );
-    res.json(rows[0]);
+    const row = rows[0];
+    res.json({
+      ...row,
+      remaining_sent_home: Boolean(row.remaining_sent_home),
+    });
   } catch (error) {
     console.error("Error upserting budget:", error);
     res.status(500).json({ error: "Failed to save budget" });

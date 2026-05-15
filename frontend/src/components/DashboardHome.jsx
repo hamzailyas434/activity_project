@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import StickyNoteModal from "./StickyNoteModal";
-import { Card, CardHeader, Ring, RhythmCheck, Icon } from "./rhythm/RhythmAtoms";
+import FavouriteNoteModal from "./FavouriteNoteModal";
+import { Card, CardHeader, RhythmCheck, Icon } from "./rhythm/RhythmAtoms";
 
 function ExpBar({ cat, pct, amt }) {
   return (
@@ -20,6 +21,9 @@ function stripHtml(html) {
   d.innerHTML = html;
   return d.textContent || d.innerText || "";
 }
+
+/** Post-it tilt — ui_kits/web/DashboardScreen.jsx */
+const STICKY_NOTE_ROTATIONS = ["rotate(-1deg)", "rotate(0.8deg)", "rotate(-0.4deg)"];
 
 export default function DashboardHome({
   monthLabel,
@@ -46,11 +50,12 @@ export default function DashboardHome({
   onOpenBooks,
   onOpenExpenses,
   setActiveTab,
+  onFavouriteNotesChanged,
 }) {
   const [stickyModalId, setStickyModalId] = useState(null);
+  const [favModalNote, setFavModalNote] = useState(null);
   const daily = summary?.daily;
   const pct = daily ? Math.min(100, Math.round(daily.percentage || 0)) : 0;
-  const ringColor = "var(--indigo-400)";
 
   const openSticky = stickyNotes.find(n => n.id === stickyModalId) ?? null;
 
@@ -59,16 +64,32 @@ export default function DashboardHome({
     if (!stickyNotes.some(n => n.id === stickyModalId)) setStickyModalId(null);
   }, [stickyNotes, stickyModalId]);
 
+  useEffect(() => {
+    if (!favModalNote) return;
+    if (!favouriteBookNotes.some(n => n.id === favModalNote.id)) setFavModalNote(null);
+  }, [favouriteBookNotes, favModalNote]);
+
   const handleAddStickyOpen = async () => {
     const created = await onAddSticky();
     if (created?.id != null) setStickyModalId(created.id);
   };
 
-  const favNotesPreview = useMemo(() => {
+  /** Most recent notes first, capped for dashboard; grouped by book for display */
+  const favPreviewByBook = useMemo(() => {
     if (!favouriteBookNotes?.length) return [];
-    return [...favouriteBookNotes]
-      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
-      .slice(0, 5);
+    const sorted = [...favouriteBookNotes].sort(
+      (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)
+    );
+    const top = sorted.slice(0, 8);
+    const m = new Map();
+    for (const n of top) {
+      const id = n.book_id;
+      if (!m.has(id)) {
+        m.set(id, { book_id: id, book_title: n.book_title || "Book", notes: [] });
+      }
+      m.get(id).notes.push(n);
+    }
+    return [...m.values()];
   }, [favouriteBookNotes]);
 
   return (
@@ -99,8 +120,8 @@ export default function DashboardHome({
         </button>
       </div>
 
-      <div className="grid-12">
-        <div className="col-span-8">
+      <div className="dashboard-layout">
+        <div className="dashboard-main">
           <div className="card card-glass hero-card">
             <div className="hero-left">
               <div className="eyebrow">Today&apos;s rhythm</div>
@@ -124,58 +145,12 @@ export default function DashboardHome({
                 </div>
               </div>
             </div>
-            <Ring pct={pct} color={ringColor} size={110} label={`${pct}%`} sub="today" />
-          </div>
-        </div>
-
-        <div className="col-span-4">
-          <Card className="favourite-notes-dash-card">
-            <CardHeader
-              eyebrow="Books"
-              title="Favourite notes"
-              right={
-                favNotesPreview.length > 0 ? (
-                  <span className="favourite-notes-dash-count mono">{favouriteBookNotes.length}</span>
-                ) : null
-              }
-            />
-            <div className="favourite-notes-dash-list">
-              {favNotesPreview.length === 0 ? (
-                <p className="muted text-sm" style={{ margin: "4px 0 8px", lineHeight: 1.5 }}>
-                  No favourite notes yet. Open Books, add a page note, and tap the heart to save it here.
-                </p>
-              ) : (
-                favNotesPreview.map(note => {
-                  const raw = stripHtml(note.content || "").trim().replace(/\s+/g, " ");
-                  const snippet = raw.length > 96 ? `${raw.slice(0, 96)}…` : raw;
-                  return (
-                    <button
-                      key={note.id}
-                      type="button"
-                      className="favourite-notes-dash-row"
-                      onClick={onOpenBooks}
-                    >
-                      <span className="favourite-notes-dash-heart" aria-hidden>
-                        ♥
-                      </span>
-                      <span className="favourite-notes-dash-body">
-                        <span className="favourite-notes-dash-snippet">{snippet || "—"}</span>
-                        <span className="favourite-notes-dash-meta">
-                          {note.book_title || "Book"} · p.{note.page_number ?? "—"}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })
-              )}
+            <div className="hero-pct" aria-label={`${pct}% of activities completed today`}>
+              <span className="hero-pct-value">{pct}%</span>
+              <span className="hero-pct-sub">today</span>
             </div>
-            <button type="button" className="btn-ghost-sm favourite-notes-dash-cta" onClick={onOpenBooks}>
-              Open Books
-            </button>
-          </Card>
-        </div>
+          </div>
 
-        <div className="col-span-8 dashboard-activities-col">
           <Card>
             <CardHeader
               eyebrow={greetParts.weekday}
@@ -227,9 +202,157 @@ export default function DashboardHome({
               )}
             </div>
           </Card>
+
+          <div className="dashboard-split">
+            <Card>
+              <CardHeader
+                eyebrow={monthLabel}
+                title="Expenses"
+                right={
+                  expenseTotalFormatted ? (
+                    <span className="meta-right mono">{expenseTotalFormatted}</span>
+                  ) : (
+                    <button type="button" className="btn-ghost-sm" onClick={onOpenExpenses}>
+                      Open
+                    </button>
+                  )
+                }
+              />
+              {expenseBars && expenseBars.length > 0 ? (
+                <div className="exp-bars">
+                  {expenseBars.map(row => (
+                    <ExpBar key={row.cat} cat={row.cat} pct={row.pct} amt={row.amt} />
+                  ))}
+                </div>
+              ) : (
+                <p className="muted text-sm">
+                  No expense data this month.{" "}
+                  <button type="button" className="btn-link" onClick={onOpenExpenses}>
+                    Add expenses
+                  </button>
+                </p>
+              )}
+            </Card>
+
+            <Card>
+              <CardHeader
+                eyebrow="Reading"
+                title="Currently on"
+                right={
+                  <button type="button" className="btn-ghost-sm" onClick={onOpenBooks}>
+                    Library
+                  </button>
+                }
+              />
+              {booksSummary?.current_book ? (
+                <div className="book-row">
+                  <div
+                    className="book-cover"
+                    style={{ background: "linear-gradient(145deg, #36309C, #7C3AED)" }}
+                  >
+                    <div className="book-title-vert">{booksSummary.current_book.title?.slice(0, 18)}</div>
+                  </div>
+                  <div className="book-info">
+                    <div className="book-title">{booksSummary.current_book.title}</div>
+                    <div className="book-author">{booksSummary.current_book.author || " "}</div>
+                    <div className="book-prog">
+                      <div
+                        className="book-prog-fill"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            booksSummary.current_book.total_pages > 0
+                              ? Math.round(
+                                  (booksSummary.current_book.current_page / booksSummary.current_book.total_pages) * 100
+                                )
+                              : 0
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="mono text-xs muted">
+                      {booksSummary.current_book.current_page} / {booksSummary.current_book.total_pages || "—"} pp
+                      {booksSummary.current_book.total_pages > 0
+                        ? ` · ${Math.round(
+                            (booksSummary.current_book.current_page / booksSummary.current_book.total_pages) * 100
+                          )}%`
+                        : ""}
+                    </div>
+                    <button type="button" className="btn-ghost-sm" style={{ marginTop: 8 }} onClick={onOpenBooks}>
+                      Open notes
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="muted text-sm">
+                  No book in progress.{" "}
+                  <button type="button" className="btn-link" onClick={onOpenBooks}>
+                    Open Books
+                  </button>
+                </p>
+              )}
+            </Card>
+          </div>
         </div>
 
-        <div className="col-span-4">
+        <aside className="dashboard-sidebar">
+          <Card className="favourite-notes-dash-card">
+            <CardHeader
+              eyebrow="Books"
+              title="Favourite notes"
+              right={
+                favouriteBookNotes.length > 0 ? (
+                  <span className="favourite-notes-dash-count mono">{favouriteBookNotes.length}</span>
+                ) : null
+              }
+            />
+            <div className="favourite-notes-dash-list">
+              {favPreviewByBook.length === 0 ? (
+                <p className="muted text-sm" style={{ margin: "4px 0 8px", lineHeight: 1.5 }}>
+                  No favourite notes yet. Open Books, add a page note, and tap the heart to save it here.
+                </p>
+              ) : (
+                favPreviewByBook.map(group => (
+                  <div key={group.book_id} className="favourite-notes-dash-book-block">
+                    <div className="favourite-notes-dash-book-label">{group.book_title}</div>
+                    {group.notes.map(note => {
+                      const raw = stripHtml(note.content || "")
+                        .trim()
+                        .replace(/\s+/g, " ");
+                      const snippet = raw.length > 96 ? `${raw.slice(0, 96)}…` : raw;
+                      return (
+                        <button
+                          key={note.id}
+                          type="button"
+                          className="favourite-notes-dash-row"
+                          onClick={() => setFavModalNote(note)}
+                        >
+                          <span className="favourite-notes-dash-heart" aria-hidden>
+                            ♥
+                          </span>
+                          <span className="favourite-notes-dash-body">
+                            <span className="favourite-notes-dash-snippet">
+                              <span className="favourite-notes-dash-pin" aria-hidden>
+                                📌
+                              </span>
+                              {snippet || "—"}
+                            </span>
+                            <span className="favourite-notes-dash-meta">
+                              p.{note.page_number ?? "—"}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))
+              )}
+            </div>
+            <button type="button" className="btn-ghost-sm favourite-notes-dash-cta" onClick={onOpenBooks}>
+              Open Books
+            </button>
+          </Card>
+
           <Card className="sticky-notes-card">
             <div className="sticky-notes-card__head">
               <div>
@@ -243,10 +366,10 @@ export default function DashboardHome({
                 title="Add note"
                 aria-label="Add note"
               >
-                <Icon name="plus" size={18} />
+                <Icon name="plus" size={14} />
               </button>
             </div>
-            <div className="sticky-notes-grid">
+            <div className="stickies">
               {stickyNotes.length === 0 ? (
                 <p className="sticky-notes-card__empty">
                   No notes yet. Tap + to add — click a note to edit.
@@ -263,130 +386,48 @@ export default function DashboardHome({
                     .trim();
                   const n = stickyNotes.length;
                   const wide = n === 1 || (n === 3 && idx === 2);
+                  const tilt = STICKY_NOTE_ROTATIONS[idx % STICKY_NOTE_ROTATIONS.length];
                   return (
                     <button
                       key={note.id}
                       type="button"
-                      className={
-                        wide ? "sticky-notes-tile sticky-notes-tile--wide" : "sticky-notes-tile"
-                      }
-                      style={{ background: note.color }}
+                      className={wide ? "sticky sticky--wide" : "sticky"}
+                      style={{
+                        background: note.color,
+                        transform: tilt,
+                      }}
                       onClick={() => setStickyModalId(note.id)}
                     >
-                      <span className="sticky-notes-tile__title">{titleLine.slice(0, 80)}</span>
-                      {bodyRest ? (
-                        <span className="sticky-notes-tile__body">{bodyRest.slice(0, 120)}</span>
-                      ) : null}
+                      <div className="sticky-t">{titleLine.slice(0, 80)}</div>
+                      {bodyRest ? <div className="sticky-b">{bodyRest.slice(0, 200)}</div> : null}
                     </button>
                   );
                 })
               )}
             </div>
           </Card>
-          <StickyNoteModal
-            open={openSticky != null}
-            note={openSticky}
-            stickyColors={stickyColors}
-            onClose={() => setStickyModalId(null)}
-            onStickyChange={onStickyChange}
-            onStickyColor={onStickyColor}
-            onDeleteSticky={onDeleteSticky}
-          />
-        </div>
-
-        <div className="col-span-6">
-          <Card>
-            <CardHeader
-              eyebrow={monthLabel}
-              title="Expenses"
-              right={
-                expenseTotalFormatted ? (
-                  <span className="meta-right mono">{expenseTotalFormatted}</span>
-                ) : (
-                  <button type="button" className="btn-ghost-sm" onClick={onOpenExpenses}>
-                    Open
-                  </button>
-                )
-              }
-            />
-            {expenseBars && expenseBars.length > 0 ? (
-              <div className="exp-bars">
-                {expenseBars.map(row => (
-                  <ExpBar key={row.cat} cat={row.cat} pct={row.pct} amt={row.amt} />
-                ))}
-              </div>
-            ) : (
-              <p className="muted text-sm">
-                No expense data this month.{" "}
-                <button type="button" className="btn-link" onClick={onOpenExpenses}>
-                  Add expenses
-                </button>
-              </p>
-            )}
-          </Card>
-        </div>
-
-        <div className="col-span-6">
-          <Card>
-            <CardHeader
-              eyebrow="Reading"
-              title="Currently on"
-              right={
-                <button type="button" className="btn-ghost-sm" onClick={onOpenBooks}>
-                  Library
-                </button>
-              }
-            />
-            {booksSummary?.current_book ? (
-              <div className="book-row">
-                <div
-                  className="book-cover"
-                  style={{ background: "linear-gradient(145deg, #36309C, #7C3AED)" }}
-                >
-                  <div className="book-title-vert">{booksSummary.current_book.title?.slice(0, 18)}</div>
-                </div>
-                <div className="book-info">
-                  <div className="book-title">{booksSummary.current_book.title}</div>
-                  <div className="book-author">{booksSummary.current_book.author || " "}</div>
-                  <div className="book-prog">
-                    <div
-                      className="book-prog-fill"
-                      style={{
-                        width: `${Math.min(
-                          100,
-                          booksSummary.current_book.total_pages > 0
-                            ? Math.round(
-                                (booksSummary.current_book.current_page / booksSummary.current_book.total_pages) * 100
-                              )
-                            : 0
-                        )}%`,
-                      }}
-                    />
-                  </div>
-                  <div className="mono text-xs muted">
-                    {booksSummary.current_book.current_page} / {booksSummary.current_book.total_pages || "—"} pp
-                    {booksSummary.current_book.total_pages > 0
-                      ? ` · ${Math.round(
-                          (booksSummary.current_book.current_page / booksSummary.current_book.total_pages) * 100
-                        )}%`
-                      : ""}
-                  </div>
-                  <button type="button" className="btn-ghost-sm" style={{ marginTop: 8 }} onClick={onOpenBooks}>
-                    Open notes
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <p className="muted text-sm">
-                No book in progress.{" "}
-                <button type="button" className="btn-link" onClick={onOpenBooks}>
-                  Open Books
-                </button>
-              </p>
-            )}
-          </Card>
-        </div>
+        </aside>
       </div>
+
+      <FavouriteNoteModal
+        open={favModalNote != null}
+        activeNote={favModalNote}
+        bookSiblings={
+          favModalNote ? favouriteBookNotes.filter(n => n.book_id === favModalNote.book_id) : []
+        }
+        onClose={() => setFavModalNote(null)}
+        onOpenBookPage={() => setActiveTab("books")}
+        onFavouritesChanged={onFavouriteNotesChanged}
+      />
+      <StickyNoteModal
+        open={openSticky != null}
+        note={openSticky}
+        stickyColors={stickyColors}
+        onClose={() => setStickyModalId(null)}
+        onStickyChange={onStickyChange}
+        onStickyColor={onStickyColor}
+        onDeleteSticky={onDeleteSticky}
+      />
     </div>
   );
 }

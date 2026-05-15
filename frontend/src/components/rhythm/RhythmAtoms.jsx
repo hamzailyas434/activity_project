@@ -20,13 +20,34 @@ export function CardHeader({ eyebrow, title, right }) {
   );
 }
 
-export function Ring({ pct, color, size = 72, label, sub }) {
+export function Ring({
+  pct,
+  color = "var(--accent)",
+  size = 72,
+  label,
+  sub,
+  labelOnly = false,
+  className = "",
+}) {
+  if (labelOnly) {
+    return (
+      <div
+        className={`ring ring--label-only ${className}`.trim()}
+        style={{ width: size, height: size }}
+      >
+        <div className="ring-label">
+          <div className="ring-pct">{label ?? `${pct}%`}</div>
+          {sub && <div className="ring-sub">{sub}</div>}
+        </div>
+      </div>
+    );
+  }
   const r = (size - 10) / 2;
   const c = 2 * Math.PI * r;
   const off = c - (pct / 100) * c;
   return (
     <div className="ring" style={{ width: size, height: size }}>
-      <svg viewBox={`0 0 ${size} ${size}`}>
+      <svg viewBox={`0 0 ${size} ${size}`} focusable="false" aria-hidden>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--border)" strokeWidth="6" />
         <circle
           cx={size / 2}
@@ -125,6 +146,12 @@ const ICON_PATHS = {
   moon: (
     <>
       <path d="M20 12a8 8 0 0 1-14 5.5 8 8 0 0 0 14-5.5z" />
+    </>
+  ),
+  book: (
+    <>
+      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
     </>
   ),
 };

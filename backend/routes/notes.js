@@ -9,10 +9,10 @@ router.get("/attachments/:id",    notesController.getAttachment);
 router.post("/upload",            notesController.uploadFile);
 
 // Answer routes
-router.post("/:noteId/answers",               notesController.createAnswer);
-router.put("/answers/:answerId",              notesController.updateAnswer);
-router.delete("/answers/:answerId",           notesController.deleteAnswer);
-router.patch("/answers/:answerId/toggle-very-good", notesController.toggleVeryGood);
+router.post("/:noteId/answers",               v.noteIdParamRules, v.createAnswerRules, v.validate, notesController.createAnswer);
+router.put("/answers/:answerId",              v.answerIdRules, v.updateAnswerRules, v.validate, notesController.updateAnswer);
+router.delete("/answers/:answerId",           v.answerIdRules, v.validate, notesController.deleteAnswer);
+router.patch("/answers/:answerId/toggle-very-good", v.answerIdRules, v.validate, notesController.toggleVeryGood);
 
 // Note CRUD
 router.get("/",      notesController.getAllNotes);

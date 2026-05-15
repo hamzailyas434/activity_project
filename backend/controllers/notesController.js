@@ -82,19 +82,7 @@ exports.createNote = async (req, res) => {
     const userId = req.user.id;
     const { category = "general", question, answer, answers } = req.body;
 
-    console.log("Create note request - Full body:", JSON.stringify(req.body, null, 2));
-    console.log("Create note request - Parsed:", { 
-      userId, 
-      category, 
-      question: question?.substring(0, 50), 
-      hasAnswer: !!answer, 
-      answersCount: answers?.length,
-      answers: answers?.map(a => ({ 
-        answerLength: a.answer?.length || 0,
-        answerPreview: String(a.answer || "").substring(0, 30),
-        is_very_good: a.is_very_good 
-      }))
-    });
+
 
     if (!question || (typeof question === 'string' && question.trim() === "")) {
       console.error("Validation failed: Question is missing or empty");
@@ -106,28 +94,6 @@ exports.createNote = async (req, res) => {
     }
 
     // Support both old format (single answer) and new format (multiple answers)
-    console.log("Raw answers received:", {
-      answers: answers,
-      answersType: typeof answers,
-      answersIsArray: Array.isArray(answers),
-      answersLength: answers?.length,
-      answer: answer,
-      answerType: typeof answer
-    });
-    
-    const answerList = answers && Array.isArray(answers) && answers.length > 0 
-      ? answers 
-      : (answer ? [{ answer: String(answer).trim(), is_very_good: false }] : []);
-
-    console.log("Answer list after processing:", answerList.length, "answers");
-    console.log("Answer list details:", answerList.map((a, i) => ({
-      index: i,
-      hasAnswer: !!a.answer,
-      answerType: typeof a.answer,
-      answerLength: a.answer ? String(a.answer).length : 0,
-      answerPreview: a.answer ? String(a.answer).substring(0, 50) : "null/undefined",
-      is_very_good: a.is_very_good
-    })));
 
     if (answerList.length === 0) {
       console.error("Validation failed: No answers provided");
@@ -160,8 +126,6 @@ exports.createNote = async (req, res) => {
       });
     }
 
-    console.log("Valid answers with content:", answersWithContent.length, "out of", answerList.length);
-
     // Create note with legacy answer field (for backward compatibility)
     const legacyAnswer = answersWithContent[0].answer ? String(answersWithContent[0].answer).trim() : "";
     const [result] = await db.query(
@@ -170,7 +134,6 @@ exports.createNote = async (req, res) => {
     );
 
     const noteId = result.insertId;
-    console.log("Note created with ID:", noteId);
 
     // Insert multiple answers - use answersWithContent instead of answerList
     let insertedCount = 0;
@@ -180,17 +143,8 @@ exports.createNote = async (req, res) => {
       const answerText = ans.answer ? String(ans.answer).trim() : "";
       const isVeryGood = ans.is_very_good || false;
       
-      console.log(`Inserting answer ${i + 1}/${answersWithContent.length}:`, { 
-        noteId, 
-        userId, 
-        answerLength: answerText.length, 
-        answerPreview: answerText.substring(0, 50),
-        isVeryGood 
-      });
-      
       // Skip only if answer is completely empty (shouldn't happen after filtering, but double-check)
       if (answerText.length === 0) {
-        console.log(`⚠️ Skipping answer ${i + 1} - empty after processing`);
         continue;
       }
       
@@ -200,7 +154,6 @@ exports.createNote = async (req, res) => {
           [noteId, userId, answerText, isVeryGood, i]
         );
         insertedCount++;
-        console.log(`✅ Answer ${i + 1} inserted successfully with ID:`, answerResult.insertId);
       } catch (answerError) {
         console.error(`❌ Error inserting answer ${i + 1}:`, answerError);
         console.error("Error details:", answerError.code, answerError.message, answerError.sql);
@@ -216,8 +169,6 @@ exports.createNote = async (req, res) => {
       }
     }
 
-    console.log(`✅ Successfully inserted ${insertedCount} answers out of ${answersWithContent.length} valid answers`);
-
     const [newNote] = await db.query(
       "SELECT * FROM notes WHERE id = ? AND user_id = ?",
       [noteId, userId]
@@ -228,7 +179,6 @@ exports.createNote = async (req, res) => {
       "SELECT * FROM note_answers WHERE note_id = ? ORDER BY is_very_good DESC, display_order ASC, created_at ASC",
       [noteId]
     );
-    console.log("Fetched answers after insert:", answersData?.length || 0);
     newNote[0].answers = answersData || [];
 
     res.status(201).json(newNote[0]);
@@ -301,12 +251,10 @@ exports.updateNote = async (req, res) => {
 
     // Update answers if provided
     if (answers !== undefined && Array.isArray(answers)) {
-      console.log("Updating answers for note:", id, "Answers count:", answers.length);
       
       // Delete existing answers
       try {
         await db.query("DELETE FROM note_answers WHERE note_id = ? AND user_id = ?", [id, userId]);
-        console.log("Deleted existing answers");
       } catch (deleteError) {
         console.error("Error deleting existing answers:", deleteError);
         if (deleteError.code === 'ER_NO_SUCH_TABLE' || deleteError.code === '42S02') {
@@ -325,16 +273,8 @@ exports.updateNote = async (req, res) => {
         const answerText = ans.answer ? String(ans.answer).trim() : "";
         const isVeryGood = ans.is_very_good || false;
         
-        console.log(`Processing answer ${i + 1}/${answers.length}:`, {
-          answerLength: answerText.length,
-          answerPreview: answerText.substring(0, 50),
-          isVeryGood,
-          originalAnswer: ans.answer ? String(ans.answer).substring(0, 50) : "null/undefined"
-        });
-        
         // Only skip if answer is completely empty (allow HTML with just whitespace)
         if (answerText.length === 0 && (!ans.answer || String(ans.answer).trim().length === 0)) {
-          console.log(`Skipping answer ${i + 1} - empty`);
           continue;
         }
         
@@ -343,7 +283,6 @@ exports.updateNote = async (req, res) => {
             "INSERT INTO note_answers (note_id, user_id, answer, is_very_good, display_order) VALUES (?, ?, ?, ?, ?)",
             [id, userId, answerText || "", isVeryGood, i]
           );
-          console.log(`✅ Answer ${i + 1} inserted successfully with ID:`, answerResult.insertId);
         } catch (insertError) {
           console.error(`❌ Error inserting answer ${i + 1}:`, insertError);
           console.error("Error details:", insertError.code, insertError.message);
@@ -357,7 +296,6 @@ exports.updateNote = async (req, res) => {
           throw insertError;
         }
       }
-      console.log("All answers updated successfully");
     }
 
     const [updated] = await db.query(
@@ -470,16 +408,6 @@ exports.uploadFile = async (req, res) => {
     const userId = req.user.id;
     const { fileData, fileName, mimeType, type, noteId } = req.body;
 
-    // Log request for debugging
-    console.log("Upload request received:", {
-      userId,
-      fileName: fileName || "unknown",
-      mimeType: mimeType || "unknown",
-      type: type || "unknown",
-      noteId: noteId || null,
-      fileDataLength: fileData ? fileData.length : 0
-    });
-
     if (!fileData) {
       console.error("No file data in request body");
       return res.status(400).json({ error: "No file data provided" });
@@ -510,11 +438,6 @@ exports.uploadFile = async (req, res) => {
       const fileBuffer = Buffer.from(base64Data, "base64");
       const fileSize = fileBuffer.length;
 
-      console.log("File processed:", {
-        fileSize,
-        fileName: fileName || "unknown"
-      });
-
       // Limit file size to 10MB
       const maxSize = 10 * 1024 * 1024; // 10MB
       if (fileSize > maxSize) {
@@ -528,8 +451,6 @@ exports.uploadFile = async (req, res) => {
 
       // Always return data URL - files are stored in the answer field as base64
       const dataUrl = `data:${mimeType};base64,${base64Data}`;
-      
-      console.log("Returning data URL, length:", dataUrl.length);
 
       // Return data URL (files will be stored in the answer field when note is saved)
       res.json({
@@ -570,7 +491,8 @@ exports.getAttachment = async (req, res) => {
 
     const attachment = attachments[0];
     res.setHeader("Content-Type", attachment.file_type);
-    res.setHeader("Content-Disposition", `inline; filename="${attachment.file_name}"`);
+    const safeName = encodeURIComponent(attachment.file_name).replace(/['()]/g, encodeURIComponent);
+    res.setHeader("Content-Disposition", `inline; filename*=UTF-8''${safeName}`);
     res.setHeader("Content-Length", attachment.file_size);
     res.send(attachment.file_data);
   } catch (error) {
