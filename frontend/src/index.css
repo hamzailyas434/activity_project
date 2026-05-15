@@ -2356,6 +2356,98 @@
   .info-label { font-size: 0.82rem; color: var(--fg-muted); font-weight: 500; }
   .info-value { font-size: 0.82rem; color: var(--fg); font-weight: 600; font-family: var(--font-mono); }
 
+  /* ── Profile Rhythm redesign ── */
+  .prf-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  @media (max-width: 860px) {
+    .prf-layout { grid-template-columns: 1fr; }
+  }
+
+  /* Avatar card */
+  .prf-hero {
+    display: flex; align-items: center; gap: 16px;
+    padding: 4px 0 8px;
+  }
+  .prf-av-wrap {
+    position: relative; flex-shrink: 0; cursor: pointer;
+    width: 72px; height: 72px; border-radius: var(--r-full);
+    overflow: hidden;
+  }
+  .prf-av-img {
+    width: 72px; height: 72px; border-radius: var(--r-full);
+    object-fit: cover; display: block;
+  }
+  .prf-av-placeholder {
+    width: 72px; height: 72px; border-radius: var(--r-full);
+    background: linear-gradient(135deg, var(--accent), var(--plum-600));
+    color: #fff; font-size: 1.75rem; font-weight: 700;
+    font-family: var(--font-display);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .prf-av-overlay {
+    position: absolute; inset: 0; border-radius: var(--r-full);
+    background: rgba(0,0,0,0.45); color: #fff;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity var(--dur-fast);
+  }
+  .prf-av-wrap:hover .prf-av-overlay { opacity: 1; }
+
+  .prf-hero-info { flex: 1; min-width: 0; }
+  .prf-hero-name {
+    font-family: var(--font-display); font-size: var(--text-xl);
+    font-weight: 700; color: var(--fg);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .prf-hero-email {
+    font-size: var(--text-sm); color: var(--fg-muted);
+    margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .prf-badge {
+    display: inline-flex; align-items: center;
+    font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+    padding: 2px 8px; border-radius: var(--r-full);
+    background: var(--accent-weak); color: var(--accent);
+  }
+  .prf-badge--muted { background: var(--bg-raised); color: var(--fg-muted); }
+
+  /* Profile form */
+  .prf-form {
+    display: flex; flex-direction: column; gap: 14px;
+    margin-top: 16px;
+  }
+  .prf-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .prf-field { display: flex; flex-direction: column; gap: 5px; }
+  .prf-label {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--fg-subtle);
+  }
+  .prf-input {
+    padding: 8px 11px; border-radius: var(--r-md);
+    border: 1px solid var(--border); background: var(--bg-raised);
+    color: var(--fg); font-family: var(--font-sans); font-size: 14px;
+    transition: border-color var(--dur-fast);
+    width: 100%; box-sizing: border-box;
+  }
+  .prf-input:focus { outline: none; border-color: var(--accent); }
+  .prf-input::placeholder { color: var(--fg-faint); }
+
+  /* Activity log chips */
+  .prf-log-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12px; padding: 3px 9px; border-radius: var(--r-full);
+    background: var(--bg-raised); border: 1px solid var(--border);
+    color: var(--fg); font-family: var(--font-sans);
+  }
+  .prf-log-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent); flex-shrink: 0;
+  }
+
   /* ══════════════════════════════════════════════════════
      ActivityManager Component
   ══════════════════════════════════════════════════════ */
@@ -2424,6 +2516,20 @@
     transition: color var(--dur-fast), background var(--dur-fast); flex-shrink: 0;
   }
   .activity-chip-delete:hover { color: var(--danger); background: var(--danger-weak); }
+  .activity-chip-edit {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: none; background: transparent;
+    color: var(--fg-faint); cursor: pointer; font-size: 0.8rem;
+    display: flex; align-items: center; justify-content: center;
+    transition: color var(--dur-fast), background var(--dur-fast); flex-shrink: 0;
+  }
+  .activity-chip-edit:hover { color: var(--accent); background: var(--accent-weak); }
+  .activity-chip-edit-input {
+    border: none; background: transparent; outline: none;
+    font: inherit; font-weight: 500; color: var(--fg);
+    width: 120px; border-bottom: 1px solid var(--accent);
+    padding: 0 2px;
+  }
   .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
   .act-chip {
     display: inline-flex; align-items: center; gap: 6px;

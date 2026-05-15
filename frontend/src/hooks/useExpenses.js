@@ -1,11 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-
-function formatMoney(n) {
-  if (n == null || Number.isNaN(n)) return "";
-  return Number(n).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-}
+import { useCurrency } from "./useCurrency";
 
 export default function useExpenses(api, month, year) {
+  const { format: formatMoney } = useCurrency();
   const [rows, setRows] = useState([]);
 
   const fetchExpenses = useCallback(async () => {
@@ -37,7 +34,7 @@ export default function useExpenses(api, month, year) {
       .sort((a, b) => b.pct - a.pct)
       .slice(0, 5);
     return { total, totalFmt: formatMoney(total), bars };
-  }, [rows]);
+  }, [rows, formatMoney]);
 
   useEffect(() => { fetchExpenses(); }, [fetchExpenses]);
 

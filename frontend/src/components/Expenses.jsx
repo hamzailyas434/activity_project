@@ -4,6 +4,7 @@ import Swal from "sweetalert2";
 
 import { API_BASE_URL } from "../config";
 import { Ring } from "./rhythm/RhythmAtoms";
+import { useCurrency } from "../hooks/useCurrency";
 
 const fmt = (n) =>
   Number(n || 0).toLocaleString("en-PK", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -58,6 +59,7 @@ function DelBtn({ onClick }) {
 }
 
 function AddExpenseRow({ category, onSave, onCancel }) {
+  const { symbol: currencySymbol } = useCurrency();
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
@@ -91,7 +93,7 @@ function AddExpenseRow({ category, onSave, onCancel }) {
         <input className="exp-fi" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
       )}
       <div className="exp-pkr-input">
-        <span className="exp-pkr-pre">PKR</span>
+        <span className="exp-pkr-pre">{currencySymbol}</span>
         <input type="text" inputMode="decimal" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
       </div>
       {sub === "bills" && (
@@ -104,6 +106,7 @@ function AddExpenseRow({ category, onSave, onCancel }) {
 }
 
 function ExpenseRow({ item, category, onSave, onDelete }) {
+  const { symbol: currencySymbol } = useCurrency();
   const [editing, setEditing] = useState(item._new || false);
   const [name, setName] = useState(item.name || "");
   const [amount, setAmount] = useState(item.amount != null ? String(item.amount) : "");
@@ -162,7 +165,7 @@ function ExpenseRow({ item, category, onSave, onDelete }) {
           placeholder={category === "home_bills" ? "Bill name" : category === "home_person" ? "Name" : "Name"}
         />
         <div className="exp-pkr-input">
-          <span className="exp-pkr-pre">PKR</span>
+          <span className="exp-pkr-pre">{currencySymbol}</span>
           <input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" />
         </div>
         {category === "home_bills" && (
@@ -191,7 +194,7 @@ function ExpenseRow({ item, category, onSave, onDelete }) {
         <div className="exp-txn-date">{formatExpenseDate(item.bill_date)}</div>
       )}
       <div className="exp-txn-right">
-        <span className="exp-txn-amt">PKR {fmt(item.amount)}</span>
+        <span className="exp-txn-amt">{currencySymbol} {fmt(item.amount)}</span>
         <DelBtn onClick={handleDeleteClick} />
       </div>
     </div>
@@ -204,6 +207,7 @@ function ExpenseRow({ item, category, onSave, onDelete }) {
  */
 function Expenses({ year, month, onSelectMonthIndex }) {
   const { token } = useAuth();
+  const { symbol: currencySymbol, format: formatMoney } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [budget, setBudget] = useState(0);
   const [budgetInput, setBudgetInput] = useState("");
@@ -453,7 +457,7 @@ function Expenses({ year, month, onSelectMonthIndex }) {
 
           <div className="exp-hero-mid">
             <div className="exp-hero-label">Monthly budget — {MONTH_FULL[month - 1]} {year}</div>
-            <div className="exp-hero-big">PKR {fmt(totalSpent)}</div>
+            <div className="exp-hero-big">{currencySymbol} {fmt(totalSpent)}</div>
             <div className="exp-hero-spent-note">Total spent</div>
             <div
               className={`exp-hero-remaining-inline${remainingSentHome ? " exp-hero-remaining-inline--complete" : ""}`}
@@ -463,12 +467,12 @@ function Expenses({ year, month, onSelectMonthIndex }) {
                   <div className="exp-hero-sum" aria-label={`Spent ${fmt(totalSpent)} plus sent home ${fmt(remaining)} equals budget ${fmt(budget)}`}>
                     <span className="exp-hero-sum-label">Accounted</span>
                     <div className="exp-hero-sum-equation">
-                      <span className="exp-hero-sum-part">PKR {fmt(totalSpent)}</span>
+                      <span className="exp-hero-sum-part">{currencySymbol} {fmt(totalSpent)}</span>
                       <span className="exp-hero-sum-op" aria-hidden> + </span>
-                      <span className="exp-hero-sum-part exp-hero-sum-part--accent">PKR {fmt(remaining)}</span>
+                      <span className="exp-hero-sum-part exp-hero-sum-part--accent">{currencySymbol} {fmt(remaining)}</span>
                       <span className="exp-hero-sum-note"> sent home</span>
                       <span className="exp-hero-sum-op" aria-hidden> = </span>
-                      <span className="exp-hero-sum-total">PKR {fmt(budget)}</span>
+                      <span className="exp-hero-sum-total">{currencySymbol} {fmt(budget)}</span>
                     </div>
                   </div>
                   <span className="exp-hero-complete-tag" aria-live="polite">
@@ -479,7 +483,7 @@ function Expenses({ year, month, onSelectMonthIndex }) {
                 <>
                   <span className="exp-hero-remaining-inline-label">Remaining</span>
                   <span className={`exp-hero-remaining-inline-amt exp-hero-remaining-inline-amt--${displayRemClass}`}>
-                    PKR {fmt(displayRemaining)}
+                    {currencySymbol} {fmt(displayRemaining)}
                   </span>
                 </>
               )}
@@ -487,7 +491,7 @@ function Expenses({ year, month, onSelectMonthIndex }) {
             <div className="exp-budget-bar-wrap">
               <div className="exp-budget-bar-labels">
                 <span>spent</span>
-                <span>budget PKR {fmt(budget)}</span>
+                <span>budget {currencySymbol} {fmt(budget)}</span>
               </div>
               <div className="exp-budget-bar">
                 <div
@@ -503,7 +507,7 @@ function Expenses({ year, month, onSelectMonthIndex }) {
           <div className="exp-hero-stat">
             <div className="exp-hero-stat-label">Budget</div>
             <div className="exp-pkr-input exp-pkr-input--tight">
-              <span className="exp-pkr-pre">PKR</span>
+              <span className="exp-pkr-pre">{currencySymbol}</span>
               <input
                 type="text"
                 inputMode="decimal"
@@ -529,9 +533,9 @@ function Expenses({ year, month, onSelectMonthIndex }) {
           <div className={`exp-hero-stat exp-hero-stat--remaining${remainingSentHome ? " exp-hero-stat--sent" : ""}`}>
             <div
               className={`exp-hero-stat-val exp-hero-stat-val--${displayRemClass}`}
-              title={remainingSentHome ? `Calculated remaining: PKR ${fmt(remaining)}` : undefined}
+              title={remainingSentHome ? `Calculated remaining: ${currencySymbol} ${fmt(remaining)}` : undefined}
             >
-              PKR {fmt(displayRemaining)}
+              {currencySymbol} {fmt(displayRemaining)}
             </div>
             <div className="exp-hero-stat-sublabel">Remaining</div>
             <label
@@ -570,7 +574,7 @@ function Expenses({ year, month, onSelectMonthIndex }) {
                 }}
               />
             </div>
-            <div className="exp-cat-amount">PKR {fmt(c.total)}</div>
+            <div className="exp-cat-amount">{currencySymbol} {fmt(c.total)}</div>
           </div>
         ))}
       </div>

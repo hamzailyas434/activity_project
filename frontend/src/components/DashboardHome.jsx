@@ -162,9 +162,16 @@ export default function DashboardHome({
               }
             />
             <div className="list-rows">
-              {!todayDay || activities.length === 0 ? (
+              {activities.length === 0 ? (
+                <div style={{ padding: "12px 0", display: "flex", flexDirection: "column", gap: 8 }}>
+                  <p className="muted text-sm">No routines yet. Create your first activity to start tracking your day.</p>
+                  <button type="button" className="btn-primary" style={{ alignSelf: "flex-start" }} onClick={() => setActiveTab("activities")}>
+                    + Create activity
+                  </button>
+                </div>
+              ) : !todayDay ? (
                 <p className="muted text-sm" style={{ padding: "8px 0" }}>
-                  No activities for today in this month view, or switch to the current month.
+                  Switch to the current month to log today&apos;s activities.
                 </p>
               ) : (
                 activities.map(activity => {

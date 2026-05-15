@@ -1,4 +1,4 @@
-import { useState, memo } from "react";
+import { useState, useRef, memo } from "react";
 import { useAuth } from "../contexts/AuthContext";
 
 import { API_BASE_URL } from "../config";
@@ -11,6 +11,7 @@ function ActivityManager({
   onImportPreviousMonth,
   onActivityAdded,
   onActivityDeleted,
+  onActivityUpdated,
 }) {
   const { token } = useAuth();
   const [activityName, setActivityName] = useState("");
@@ -18,8 +19,10 @@ function ActivityManager({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState(null);
-  // Collapse the form by default when activities already exist
   const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editValue, setEditValue] = useState("");
+  const editInputRef = useRef(null);
 
   const handleSubmit = async e => {
     e.preventDefault();
@@ -104,6 +107,28 @@ function ActivityManager({
       console.error("Error deleting activity:", err);
       setError("Failed to delete activity");
     }
+  };
+
+  const handleStartEdit = (activity) => {
+    setEditingId(activity.id);
+    setEditValue(activity.name);
+    setTimeout(() => editInputRef.current?.focus(), 0);
+  };
+
+  const handleSaveEdit = async (activityId) => {
+    const trimmed = editValue.trim();
+    if (!trimmed) { setEditingId(null); return; }
+    try {
+      const res = await fetch(`${API_BASE_URL}/activities/${activityId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (res.ok) {
+        onActivityUpdated?.(activityId, trimmed);
+      }
+    } catch { /* best-effort */ }
+    setEditingId(null);
   };
 
   return (
@@ -204,13 +229,30 @@ function ActivityManager({
             {activities.map(activity => (
               <div key={activity.id} className="activity-chip">
                 <span className="activity-type-icon">
-                  {activity.type === "number"
-                    ? "🔢"
-                    : activity.type === "text"
-                    ? "🔤"
-                    : "☑️"}
+                  {activity.type === "number" ? "🔢" : activity.type === "text" ? "🔤" : "☑️"}
                 </span>
-                <span className="activity-chip-name">{activity.name}</span>
+                {editingId === activity.id ? (
+                  <input
+                    ref={editInputRef}
+                    className="activity-chip-edit-input"
+                    value={editValue}
+                    onChange={e => setEditValue(e.target.value)}
+                    onBlur={() => handleSaveEdit(activity.id)}
+                    onKeyDown={e => {
+                      if (e.key === "Enter") handleSaveEdit(activity.id);
+                      if (e.key === "Escape") setEditingId(null);
+                    }}
+                  />
+                ) : (
+                  <span className="activity-chip-name">{activity.name}</span>
+                )}
+                <button
+                  onClick={() => handleStartEdit(activity)}
+                  className="activity-chip-edit"
+                  title="Edit name"
+                >
+                  ✎
+                </button>
                 <button
                   onClick={() => handleDelete(activity.id)}
                   className="activity-chip-delete"

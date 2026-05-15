@@ -23,6 +23,7 @@ export default function ActivitiesPage({
   onImportPreviousMonth,
   onActivityAdded,
   onActivityDeleted,
+  onActivityUpdated,
   authHeaders,
   summaryStats,
 }) {
@@ -93,6 +94,7 @@ export default function ActivitiesPage({
           onImportPreviousMonth={onImportPreviousMonth}
           onActivityAdded={onActivityAdded}
           onActivityDeleted={onActivityDeleted}
+          onActivityUpdated={onActivityUpdated}
         />
       </div>
     </div>

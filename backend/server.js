@@ -5,7 +5,11 @@ const cookieParser = require("cookie-parser");
 const bodyParser = require("body-parser");
 const path = require("path");
 require("dotenv").config();
-const { globalLimiter, authLimiter, uploadLimiter } = require("./middleware/rateLimiters");
+const {
+  globalLimiter,
+  authLimiter,
+  uploadLimiter,
+} = require("./middleware/rateLimiters");
 const errorHandler = require("./middleware/errorHandler");
 
 const activityRoutes = require("./routes/activities");
@@ -81,13 +85,30 @@ app.use("/api/completions", authenticateToken, completionRoutes);
 app.use("/api/tasks", authenticateToken, require("./routes/tasks"));
 app.use("/api/qaza-namaz", authenticateToken, require("./routes/qazaNamaz"));
 app.use("/api/notes", authenticateToken, require("./routes/notes"));
-app.use("/api/sticky-notes", authenticateToken, require("./routes/stickyNotes"));
+app.use(
+  "/api/sticky-notes",
+  authenticateToken,
+  require("./routes/stickyNotes")
+);
 app.use("/api/expenses", authenticateToken, require("./routes/expenses"));
-app.use("/api/favourite-profiles", authenticateToken, require("./routes/favouriteProfiles"));
-app.use("/api/monthly-todos", authenticateToken, require("./routes/monthlyTodos"));
+app.use(
+  "/api/favourite-profiles",
+  authenticateToken,
+  require("./routes/favouriteProfiles")
+);
+app.use(
+  "/api/monthly-todos",
+  authenticateToken,
+  require("./routes/monthlyTodos")
+);
 app.use("/api/books", authenticateToken, require("./routes/books"));
-app.use("/api/admin", authenticateToken, requireOwner, require("./routes/admin"));
-app.use("/api/2fa",   require("./routes/twoFactor"));
+app.use(
+  "/api/admin",
+  authenticateToken,
+  requireOwner,
+  require("./routes/admin")
+);
+app.use("/api/2fa", require("./routes/twoFactor"));
 
 // Serve uploaded files (PDFs)
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));

@@ -74,7 +74,7 @@ function App() {
   );
 
   // Data hooks
-  const { activities, reorder: reorderActivities, refetch: refetchActivities }
+  const { activities, setActivities, reorder: reorderActivities, refetch: refetchActivities }
     = useActivities(api, currentYear, currentMonth);
 
   const {
@@ -165,8 +165,18 @@ function App() {
 
   // Auth-related handlers
   const handleAuthSuccess = useCallback((userData, authToken, remember) => login(userData, authToken, remember), [login]);
-  const handleActivityAdded = useCallback(() => refetchActivities(), [refetchActivities]);
-  const handleActivityDeleted = useCallback(() => refetchActivities(), [refetchActivities]);
+  const handleActivityAdded = useCallback((newActivity) => {
+    if (newActivity?.id) setActivities(prev => [...prev, newActivity]);
+    else refetchActivities();
+  }, [setActivities, refetchActivities]);
+
+  const handleActivityDeleted = useCallback((activityId) => {
+    setActivities(prev => prev.filter(a => a.id !== activityId));
+  }, [setActivities]);
+
+  const handleActivityUpdated = useCallback((id, name) => {
+    setActivities(prev => prev.map(a => a.id === id ? { ...a, name } : a));
+  }, [setActivities]);
 
   // Loading / auth gates
   if (authLoading) return <Spinner />;
@@ -275,6 +285,7 @@ function App() {
             onImportPreviousMonth={handleImportPreviousMonth}
             onActivityAdded={handleActivityAdded}
             onActivityDeleted={handleActivityDeleted}
+            onActivityUpdated={handleActivityUpdated}
             authHeaders={() => ({ Authorization: `Bearer ${token}` })}
             summaryStats={activitySummaryStats}
           />
