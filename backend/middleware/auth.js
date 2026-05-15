@@ -25,7 +25,7 @@ const authenticateToken = async (req, res, next) => {
 
     // Verify user still exists
     const [users] = await db.query(
-      "SELECT id, username, email FROM users WHERE id = ?",
+      "SELECT id, username, email, role, hidden_tabs, last_active FROM users WHERE id = ?",
       [decoded.userId]
     );
 
@@ -34,6 +34,16 @@ const authenticateToken = async (req, res, next) => {
     }
 
     req.user = users[0];
+
+    // Parse hidden_tabs (may come from MySQL as Buffer, string, or already-parsed array)
+    let ht = req.user.hidden_tabs;
+    if (Buffer.isBuffer(ht)) ht = ht.toString("utf8");
+    if (typeof ht === "string") { try { ht = JSON.parse(ht); } catch { ht = []; } }
+    req.user.hidden_tabs = Array.isArray(ht) ? ht : [];
+
+    // Fire-and-forget last_active update
+    db.query("UPDATE users SET last_active = NOW() WHERE id = ?", [users[0].id]).catch(() => {});
+
     next();
   } catch (error) {
     if (error.name === "JsonWebTokenError") {

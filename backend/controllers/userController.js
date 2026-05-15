@@ -53,6 +53,13 @@ exports.register = async (req, res) => {
       [username.trim(), email.trim().toLowerCase(), passwordHash]
     );
 
+    // Check if this is the first user ever → owner, else → user with books hidden
+    const [countRows] = await db.query("SELECT COUNT(*) as cnt FROM users");
+    const isFirst = countRows[0].cnt === 1;
+    const role = isFirst ? 'owner' : 'user';
+    const hidden_tabs = isFirst ? JSON.stringify([]) : JSON.stringify(['books']);
+    await db.query("UPDATE users SET role=?, hidden_tabs=? WHERE id=?", [role, hidden_tabs, result.insertId]);
+
     // Generate JWT token
     const token = jwt.sign({ userId: result.insertId, username }, JWT_SECRET, {
       expiresIn: "7d",
@@ -66,6 +73,8 @@ exports.register = async (req, res) => {
         id: result.insertId,
         username,
         email: email.trim().toLowerCase(),
+        role,
+        hidden_tabs: JSON.parse(hidden_tabs),
       },
     });
   } catch (error) {
@@ -92,7 +101,7 @@ exports.login = async (req, res) => {
     // Find user by username or email (include lockout fields)
     const [users] = await db.query(
       `SELECT id, username, email, password_hash,
-              failed_login_attempts, lockout_until
+              failed_login_attempts, lockout_until, totp_enabled, totp_secret, role, hidden_tabs
        FROM users WHERE username = ? OR email = ?`,
       [username, username]
     );
@@ -149,6 +158,12 @@ exports.login = async (req, res) => {
       return res.json({ requires2FA: true, tempToken });
     }
 
+    // Parse hidden_tabs (may be Buffer, string, or already-parsed array)
+    let ht = user.hidden_tabs;
+    if (Buffer.isBuffer(ht)) ht = ht.toString("utf8");
+    if (typeof ht === "string") { try { ht = JSON.parse(ht); } catch { ht = []; } }
+    user.hidden_tabs = Array.isArray(ht) ? ht : [];
+
     // Issue tokens via shared helper
     const { issueTokens } = require("./tokenController");
     await issueTokens(user, res, req.ip, req.headers["user-agent"]);
@@ -176,7 +191,7 @@ exports.loginVerify2FA = async (req, res) => {
     }
 
     const [users] = await db.query(
-      "SELECT id, username, email, totp_secret, totp_enabled FROM users WHERE id = ?",
+      "SELECT id, username, email, totp_secret, totp_enabled, role, hidden_tabs FROM users WHERE id = ?",
       [decoded.userId]
     );
     if (users.length === 0) return res.status(401).json({ error: "User not found" });
@@ -195,8 +210,14 @@ exports.loginVerify2FA = async (req, res) => {
     });
     if (!valid) return res.status(401).json({ error: "Invalid 2FA code" });
 
+    // Parse hidden_tabs (may be Buffer, string, or already-parsed array)
+    let ht = user.hidden_tabs;
+    if (Buffer.isBuffer(ht)) ht = ht.toString("utf8");
+    if (typeof ht === "string") { try { ht = JSON.parse(ht); } catch { ht = []; } }
+    ht = Array.isArray(ht) ? ht : [];
+
     // Use safe projection — never pass the full DB row
-    const safeUser = { id: user.id, username: user.username, email: user.email };
+    const safeUser = { id: user.id, username: user.username, email: user.email, role: user.role, hidden_tabs: ht };
     await issueTokens(safeUser, res, req.ip, req.headers["user-agent"]);
   } catch (error) {
     console.error("2FA verify error:", error);
@@ -228,7 +249,7 @@ exports.getCurrentUser = async (req, res) => {
   try {
     // Fetch full user data from database
     const [users] = await db.query(
-      "SELECT id, username, first_name, last_name, email, profile_picture, created_at FROM users WHERE id = ?",
+      "SELECT id, username, first_name, last_name, email, profile_picture, created_at, role, hidden_tabs FROM users WHERE id = ?",
       [req.user.id]
     );
 
@@ -236,7 +257,15 @@ exports.getCurrentUser = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    res.json(users[0]);
+    const currentUser = users[0];
+
+    // Parse hidden_tabs (may be Buffer, string, or already-parsed array)
+    let ht = currentUser.hidden_tabs;
+    if (Buffer.isBuffer(ht)) ht = ht.toString("utf8");
+    if (typeof ht === "string") { try { ht = JSON.parse(ht); } catch { ht = []; } }
+    currentUser.hidden_tabs = Array.isArray(ht) ? ht : [];
+
+    res.json(currentUser);
   } catch (error) {
     console.error("Error getting current user:", error);
     res.status(500).json({ error: "Failed to get user info" });

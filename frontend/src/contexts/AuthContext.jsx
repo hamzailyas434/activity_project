@@ -22,22 +22,26 @@ export function AuthProvider({ children }) {
     const storedUser  = localStorage.getItem("user")  || sessionStorage.getItem("user");
 
     if (storedToken && storedUser) {
-      // If JWT is already expired, try a silent refresh instead of using a stale token
-      if (isTokenExpired(storedToken)) {
+      // Parse stored user early so we can check for missing role field
+      let parsed = null;
+      try { parsed = JSON.parse(storedUser); } catch { /* handled below */ }
+
+      // Refresh if token expired OR stored user is missing role (old session before role feature)
+      if (isTokenExpired(storedToken) || !parsed?.role) {
         silentRefresh();
         return;
       }
 
-      // Token is still valid — restore session
+      // Token is still valid and user has role — restore session
       setToken(storedToken);
-      try {
-        const parsed = JSON.parse(storedUser);
-        if (parsed && typeof parsed === "object") setUser(parsed);
-      } catch {
-        localStorage.removeItem("user");
-        sessionStorage.removeItem("user");
-      }
+      if (parsed && typeof parsed === "object") setUser(parsed);
       setLoading(false);
+
+      // Background sync: pull fresh user data so admin tab changes apply immediately
+      fetch(`${API_BASE_URL}/users/me`, { headers: { Authorization: `Bearer ${storedToken}` } })
+        .then(r => r.ok ? r.json() : null)
+        .then(fresh => { if (fresh && typeof fresh === "object") setUser(u => ({ ...u, ...fresh })); })
+        .catch(() => {});
     } else {
       // No stored token — try cookie-based session
       silentRefresh();
@@ -138,6 +142,9 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const role = user?.role || "user";
+  const hiddenTabs = Array.isArray(user?.hidden_tabs) ? user.hidden_tabs : [];
+
   const value = {
     user,
     token,
@@ -146,6 +153,10 @@ export function AuthProvider({ children }) {
     refreshTokens,
     isAuthenticated: !!user && !!token,
     loading,
+    role,
+    hiddenTabs,
+    isOwner: role === "owner",
+    isAdmin: role === "admin" || role === "owner",
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

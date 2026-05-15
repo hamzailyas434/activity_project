@@ -122,6 +122,13 @@ export const endpoints = {
     update: (id) => `${API_BASE_URL}/tasks/${id}`,
     delete: (id) => `${API_BASE_URL}/tasks/${id}`,
   },
+  admin: {
+    users: (search = "", page = 1) => `${API_BASE_URL}/admin/users?search=${encodeURIComponent(search)}&page=${page}&limit=20`,
+    stats: () => `${API_BASE_URL}/admin/stats`,
+    updateTabs: (id) => `${API_BASE_URL}/admin/users/${id}/tabs`,
+    updateRole: (id) => `${API_BASE_URL}/admin/users/${id}/role`,
+    deleteUser: (id) => `${API_BASE_URL}/admin/users/${id}`,
+  },
 };
 
 /**

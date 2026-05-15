@@ -50,7 +50,7 @@ async function issueTokens(user, res, ip, userAgent) {
   res.json({
     message: "Login successful",
     token: accessToken,
-    user: { id: user.id, username: user.username, email: user.email },
+    user: { id: user.id, username: user.username, email: user.email, role: user.role || 'user', hidden_tabs: user.hidden_tabs || [] },
   });
 }
 
@@ -67,7 +67,7 @@ exports.refresh = async (req, res) => {
 
     // SELECT … FOR UPDATE locks the row so concurrent requests can't both pass this check
     const [rows] = await conn.query(
-      `SELECT rt.*, u.id as userId, u.username, u.email
+      `SELECT rt.*, u.id as userId, u.username, u.email, u.role, u.hidden_tabs
        FROM refresh_tokens rt
        JOIN users u ON rt.user_id = u.id
        WHERE rt.token_hash = ? AND rt.revoked_at IS NULL AND rt.expires_at > NOW()
@@ -95,9 +95,15 @@ exports.refresh = async (req, res) => {
     conn.release();
     conn = null;
 
+    // Parse hidden_tabs from the DB row (may be Buffer, string, or array)
+    let ht = row.hidden_tabs;
+    if (Buffer.isBuffer(ht)) ht = ht.toString("utf8");
+    if (typeof ht === "string") { try { ht = JSON.parse(ht); } catch { ht = []; } }
+    ht = Array.isArray(ht) ? ht : [];
+
     // Issue new tokens (separate connection — doesn't need to be in the transaction)
     await issueTokens(
-      { id: row.userId, username: row.username, email: row.email },
+      { id: row.userId, username: row.username, email: row.email, role: row.role, hidden_tabs: ht },
       res,
       req.ip,
       req.headers["user-agent"]

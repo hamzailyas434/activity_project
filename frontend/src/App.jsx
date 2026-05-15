@@ -9,6 +9,7 @@ import ProfileDropdown from "./components/ProfileDropdown";
 import Books from "./components/Books";
 import DashboardHome from "./components/DashboardHome";
 import ActivitiesPage from "./components/ActivitiesPage";
+import AdminPanel from "./components/AdminPanel";
 import ThemeAppearanceMenu from "./components/ThemeAppearanceMenu";
 import { Icon } from "./components/rhythm/RhythmAtoms";
 import LandingPage from "./components/LandingPage";
@@ -47,7 +48,7 @@ function Spinner() {
 }
 
 function App() {
-  const { user, token, login, logout, refreshTokens, isAuthenticated, loading: authLoading } = useAuth();
+  const { user, token, login, logout, refreshTokens, isAuthenticated, loading: authLoading, role, hiddenTabs, isOwner } = useAuth();
   const { theme, setTheme, colorFamily, setColorFamily } = useTheme();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -188,11 +189,17 @@ function App() {
             <span className="brand-name">Rhythm</span>
           </div>
           <nav className="tabs" aria-label="Main">
-            {TABS.map(({ id, label }) => (
+            {TABS.filter(t => !hiddenTabs.includes(t.id)).map(({ id, label }) => (
               <button key={id} type="button" className={`tab${activeTab === id ? " active" : ""}`} onClick={() => setActiveTab(id)}>
                 {label}
               </button>
             ))}
+            {isOwner && (
+              <button type="button" className={`tab tab--admin${activeTab === "admin" ? " active" : ""}`} onClick={() => setActiveTab("admin")}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ display: "inline", marginRight: 4, verticalAlign: "middle" }}><path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5z"/></svg>
+                Admin
+              </button>
+            )}
           </nav>
           <div className="topbar-right">
             <button type="button" className="icon-btn" title="Export CSV" aria-label="Export" onClick={handleExportData}>
@@ -249,6 +256,7 @@ function App() {
           <Expenses year={currentYear} month={currentMonth} onSelectMonthIndex={(m) => setCurrentDate(new Date(currentYear, m, 1))} />
         )}
         {activeTab === "favourites" && <FavouriteProfiles />}
+        {activeTab === "admin" && isOwner && <AdminPanel api={api} currentUserId={user?.id} />}
         {activeTab === "activities" && (
           <ActivitiesPage
             monthLabel={monthLabel}

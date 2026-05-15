@@ -12,6 +12,7 @@ const activityRoutes = require("./routes/activities");
 const completionRoutes = require("./routes/completions");
 const userRoutes = require("./routes/users");
 const { authenticateToken } = require("./middleware/auth");
+const { requireOwner } = require("./middleware/admin");
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -85,6 +86,7 @@ app.use("/api/expenses", authenticateToken, require("./routes/expenses"));
 app.use("/api/favourite-profiles", authenticateToken, require("./routes/favouriteProfiles"));
 app.use("/api/monthly-todos", authenticateToken, require("./routes/monthlyTodos"));
 app.use("/api/books", authenticateToken, require("./routes/books"));
+app.use("/api/admin", authenticateToken, requireOwner, require("./routes/admin"));
 app.use("/api/2fa",   require("./routes/twoFactor"));
 
 // Serve uploaded files (PDFs)
