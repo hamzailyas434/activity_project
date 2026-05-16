@@ -203,15 +203,15 @@ exports.toggleFavouritePageRules = [
 
 // ── Monthly Todos ─────────────────────────────────────────────────────────────
 exports.createTodoRules = [
-  body("title").trim().notEmpty().withMessage("Title required")
-    .isLength({ max: 255 }).withMessage("Title must be under 255 characters"),
+  body("text").trim().notEmpty().withMessage("Text required")
+    .isLength({ max: 255 }).withMessage("Text must be under 255 characters"),
   body("month").isInt({ min: 1, max: 12 }).withMessage("Invalid month"),
   body("year").isInt({ min: 2000, max: 2100 }).withMessage("Invalid year"),
   body("completed").optional().isBoolean().withMessage("completed must be boolean"),
 ];
 
 exports.updateTodoRules = [
-  body("title").optional().trim().isLength({ max: 255 }).withMessage("Title too long"),
+  body("text").optional().trim().isLength({ max: 255 }).withMessage("Text too long"),
   body("completed").optional().isBoolean().withMessage("completed must be boolean"),
   body("position").optional().isInt({ min: 0 }).withMessage("Position must be non-negative"),
 ];
@@ -255,9 +255,10 @@ exports.recordIdRules = [
 ];
 
 exports.upsertRecordRules = [
-  body("name").trim().notEmpty().withMessage("Record name required").isLength({ max: 200 }),
-  body("phone").optional().isLength({ max: 50 }).withMessage("Phone too long"),
-  body("notes").optional().isLength({ max: 2000 }).withMessage("Notes too long"),
+  body("gift_item").trim().notEmpty().withMessage("Gift item required").isLength({ max: 255 }),
+  body("gift_date").optional({ nullable: true }).isISO8601().withMessage("Invalid date"),
+  body("amount").optional().isNumeric().withMessage("Amount must be a number"),
+  body("note").optional().isLength({ max: 2000 }).withMessage("Note too long"),
 ];
 
 // ── Notes — Answers ──────────────────────────────────────────────────────────

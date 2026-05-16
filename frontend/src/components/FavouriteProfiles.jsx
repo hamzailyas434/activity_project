@@ -134,6 +134,7 @@ function ProfileModal({ profile, onSave, onClose, onDelete, authHeaders }) {
         method: "POST", headers: authHeaders,
         body: JSON.stringify({ gift_item: gName.trim(), gift_date: gDate || null, amount: gAmount || 0, note: "" }),
       });
+      if (!res.ok) return;
       const saved = await res.json();
       setGifts(prev => [saved, ...prev]);
       setGName(""); setGDate(""); setGAmount(""); setAddingGift(false);
