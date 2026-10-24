@@ -6,7 +6,12 @@ const v = require("../middleware/validators");
 // Specific routes before parameterized
 router.get("/categories",         notesController.getCategories);
 router.get("/attachments/:id",    notesController.getAttachment);
+router.delete("/attachments/:id", notesController.deleteAttachment);
 router.post("/upload",            notesController.uploadFile);
+
+// Attachment routes
+router.get("/:noteId/attachments",  v.noteIdParamRules, v.validate, notesController.listAttachments);
+router.post("/:noteId/attachments", v.noteIdParamRules, v.validate, notesController.addAttachment);
 
 // Answer routes
 router.post("/:noteId/answers",               v.noteIdParamRules, v.createAnswerRules, v.validate, notesController.createAnswer);

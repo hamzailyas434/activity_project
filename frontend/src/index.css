@@ -78,3 +78,4 @@ mark.hl{background:var(--accent-soft);color:var(--accent);border-radius:4px;padd
 .rt ul{list-style:disc}.rt ol{list-style:decimal}
 .rte .ProseMirror p{margin:2px 0}
 .rte .ProseMirror a,.rt a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+.rte .ProseMirror:empty::before{content:attr(data-placeholder);color:var(--fg-4);pointer-events:none}

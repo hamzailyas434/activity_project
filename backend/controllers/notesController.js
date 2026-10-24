@@ -28,6 +28,15 @@ exports.getAllNotes = async (req, res) => {
     }
 
     const [notes] = await db.query(query, params);
+
+    // Attachment counts for the cards (table may not exist on older installs)
+    let counts = {};
+    try {
+      const [c] = await db.query("SELECT note_id, COUNT(*) AS n FROM note_attachments WHERE user_id = ? GROUP BY note_id", [userId]);
+      counts = Object.fromEntries(c.map(r => [r.note_id, Number(r.n)]));
+    } catch (e) {
+      if (e.code !== "ER_NO_SUCH_TABLE") throw e;
+    }
     
     // Fetch answers for each note
     for (let note of notes) {
@@ -36,6 +45,7 @@ exports.getAllNotes = async (req, res) => {
         [note.id]
       );
       note.answers = answers || [];
+      note.attachments_count = counts[note.id] || 0;
     }
     
     res.json(notes);
@@ -658,5 +668,66 @@ exports.toggleVeryGood = async (req, res) => {
   } catch (error) {
     console.error("Error toggling very good status:", error);
     res.status(500).json({ error: "Failed to toggle very good status" });
+  }
+};
+// ── Note attachments (note_attachments table) ────────────────────────────────
+
+// GET /api/notes/:noteId/attachments — metadata only
+exports.listAttachments = async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT id, file_name, file_type, file_size, created_at FROM note_attachments
+       WHERE note_id = ? AND user_id = ? ORDER BY created_at ASC`,
+      [req.params.noteId, req.user.id]
+    );
+    res.json(rows);
+  } catch (error) {
+    if (error.code === "ER_NO_SUCH_TABLE") return res.json([]);
+    console.error("Error listing attachments:", error);
+    res.status(500).json({ error: "Failed to fetch attachments" });
+  }
+};
+
+// POST /api/notes/:noteId/attachments { fileData (base64 or data URL), fileName, mimeType }
+exports.addAttachment = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { noteId } = req.params;
+    const { fileData, fileName, mimeType } = req.body || {};
+    if (!fileData) return res.status(400).json({ error: "No file data provided" });
+    if (!mimeType || !ALLOWED_MIME_TYPES.has(mimeType)) {
+      return res.status(400).json({ error: "Unsupported file type. Only JPEG, PNG, GIF, WebP, and PDF are allowed." });
+    }
+    const [notes] = await db.query("SELECT id FROM notes WHERE id = ? AND user_id = ?", [noteId, userId]);
+    if (!notes.length) return res.status(404).json({ error: "Note not found" });
+
+    const b64 = String(fileData).startsWith("data:") ? String(fileData).split(",")[1] || "" : String(fileData);
+    const buf = Buffer.from(b64, "base64");
+    if (!buf.length) return res.status(400).json({ error: "Invalid file data" });
+    if (buf.length > 7 * 1024 * 1024) return res.status(400).json({ error: "File size exceeds 7MB limit" });
+    if (!hasValidMagicBytes(buf, mimeType)) return res.status(400).json({ error: "File content does not match declared type." });
+
+    const name = String(fileName || "file").slice(0, 255);
+    const [r] = await db.query(
+      "INSERT INTO note_attachments (note_id, user_id, file_name, file_type, file_data, file_size) VALUES (?, ?, ?, ?, ?, ?)",
+      [noteId, userId, name, mimeType, buf, buf.length]
+    );
+    res.status(201).json({ id: r.insertId, file_name: name, file_type: mimeType, file_size: buf.length, created_at: new Date() });
+  } catch (error) {
+    if (error.code === "ER_NO_SUCH_TABLE") return res.status(503).json({ error: "Attachments not set up — run scripts/add_attachments_table.js" });
+    console.error("Error adding attachment:", error);
+    res.status(500).json({ error: "Failed to upload attachment" });
+  }
+};
+
+// DELETE /api/notes/attachments/:id
+exports.deleteAttachment = async (req, res) => {
+  try {
+    const [r] = await db.query("DELETE FROM note_attachments WHERE id = ? AND user_id = ?", [req.params.id, req.user.id]);
+    if (!r.affectedRows) return res.status(404).json({ error: "Attachment not found" });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting attachment:", error);
+    res.status(500).json({ error: "Failed to delete attachment" });
   }
 };
