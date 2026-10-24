@@ -61,6 +61,7 @@ exports.createActivityRules = [
   body("type").optional().isIn(["checkbox", "number", "text"]).withMessage("Invalid activity type"),
   body("icon").optional().isLength({ max: 10 }).withMessage("Icon too long"),
   body("color").optional().matches(/^#[0-9a-fA-F]{3,6}$/).withMessage("Invalid color hex code"),
+  body("group").optional({ nullable: true }).isIn(["Prayers", "Dhikr", "Study", "Health", ""]).withMessage("Invalid group"),
 ];
 
 exports.activityIdRules = [

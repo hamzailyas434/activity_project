@@ -102,6 +102,7 @@ app.use(
   require("./routes/monthlyTodos")
 );
 app.use("/api/books", authenticateToken, require("./routes/books"));
+app.use("/api/day-journal", authenticateToken, require("./routes/dayJournal"));
 app.use(
   "/api/admin",
   authenticateToken,

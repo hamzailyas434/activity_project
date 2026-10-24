@@ -47,7 +47,7 @@ exports.getAllActivities = async (req, res) => {
 
 // Create new activity (and add to current month's routine if year/month provided)
 exports.createActivity = async (req, res) => {
-  const { name, type = "checkbox", icon = "✓", color = "#6366f1", year, month } = req.body;
+  const { name, type = "checkbox", icon = "✓", color = "#6366f1", year, month, group = null } = req.body;
   const userId = req.user.id;
 
   if (!name || name.trim() === "") {
@@ -55,10 +55,20 @@ exports.createActivity = async (req, res) => {
   }
 
   try {
-    const [result] = await db.query(
-      "INSERT INTO activities (name, type, icon, color, user_id) VALUES (?, ?, ?, ?, ?)",
-      [name.trim(), type, icon, color, userId]
-    );
+    let result;
+    try {
+      [result] = await db.query(
+        "INSERT INTO activities (name, type, icon, color, user_id, `group`) VALUES (?, ?, ?, ?, ?, ?)",
+        [name.trim(), type, icon, color, userId, group || null]
+      );
+    } catch (err) {
+      // activities.group not migrated yet — create without it
+      if (err.code !== "ER_BAD_FIELD_ERROR") throw err;
+      [result] = await db.query(
+        "INSERT INTO activities (name, type, icon, color, user_id) VALUES (?, ?, ?, ?, ?)",
+        [name.trim(), type, icon, color, userId]
+      );
+    }
 
     const [newActivity] = await db.query(
       "SELECT * FROM activities WHERE id = ? AND user_id = ?",
@@ -96,7 +106,7 @@ exports.createActivity = async (req, res) => {
 // Update activity
 exports.updateActivity = async (req, res) => {
   const { id } = req.params;
-  const { name, display_order, icon, color } = req.body;
+  const { name, display_order, icon, color, group } = req.body;
   const userId = req.user.id;
 
   try {
@@ -121,6 +131,11 @@ exports.updateActivity = async (req, res) => {
     if (color !== undefined) {
       updates.push("color = ?");
       values.push(color);
+    }
+
+    if (group !== undefined) {
+      updates.push("`group` = ?");
+      values.push(group || null);
     }
 
     if (updates.length === 0) {
