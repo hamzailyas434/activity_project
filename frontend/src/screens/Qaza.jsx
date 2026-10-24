@@ -24,8 +24,9 @@ export default function Qaza() {
   const [q, setQ] = useState(null), [base, setBase] = useState(null), [pace, setPace] = useState(1), [busy, setBusy] = useState(false);
   if (data && data !== base) { setBase(data); setQ(data); }
 
-  if (loading && !q) return <><Head n="03" eyebrow="Qaza Namaz" title={<>Loading <em>qaza</em>.</>} /><Skeleton tiles={[["s7", 280], ["s5", 280], ["s12", 260]]} /></>;
-  if (error && !q) return <Empty title="Couldn't load" body={error} action={<button type="button" className="btn primary" onClick={reload}>Try again</button>} />;
+  // q stays null for the render that first sets it from data, so keep showing the skeleton until it lands
+  if (!q && (loading || data)) return <><Head n="03" eyebrow="Qaza Namaz" title={<>Loading <em>qaza</em>.</>} /><Skeleton tiles={[["s7", 280], ["s5", 280], ["s12", 260]]} /></>;
+  if (!q) return <Empty title="Couldn't load" body={error} action={<button type="button" className="btn primary" onClick={reload}>Try again</button>} />;
 
   const dirty = JSON.stringify({ y: q.years, a: q.adj }) !== JSON.stringify({ y: base.years, a: base.adj });
   const tot = P.reduce((t, n) => ({ o: t.o + owedOf(q, n), r: t.r + remOf(q, n) }), { o: 0, r: 0 });
