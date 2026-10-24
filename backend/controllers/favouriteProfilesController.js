@@ -23,15 +23,15 @@ exports.getProfiles = async (req, res) => {
 exports.createProfile = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { name, relation = "", color = "iris", bday = null, phone = "", notes = "" } = req.body;
+    const { name, relation = "", color = "iris", bday = null, phone = "", notes = "", shoe_number = "", dress_color = "" } = req.body;
 
     let insertId;
     try {
       // New schema (post-migration)
       const [result] = await db.query(
-        `INSERT INTO favourite_profiles (user_id, name, relation, color, bday, phone, notes, category)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [userId, name, relation, color, bday || null, phone, notes, relation]
+        `INSERT INTO favourite_profiles (user_id, name, relation, color, bday, phone, notes, category, shoe_number, dress_color)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [userId, name, relation, color, bday || null, phone, notes, relation, shoe_number, dress_color]
       );
       insertId = result.insertId;
     } catch {
@@ -59,16 +59,17 @@ exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
     const { id } = req.params;
-    const { name, relation = "", color = "iris", bday = null, phone = "", notes = "" } = req.body;
+    const { name, relation = "", color = "iris", bday = null, phone = "", notes = "", shoe_number, dress_color } = req.body;
 
     let result;
     try {
-      // New schema (post-migration)
+      // New schema (post-migration). Shoe size / dress colour are only touched when sent.
       [result] = await db.query(
         `UPDATE favourite_profiles
-         SET name = ?, relation = ?, color = ?, bday = ?, phone = ?, notes = ?, category = ?
+         SET name = ?, relation = ?, color = ?, bday = ?, phone = ?, notes = ?, category = ?,
+             shoe_number = COALESCE(?, shoe_number), dress_color = COALESCE(?, dress_color)
          WHERE id = ? AND user_id = ?`,
-        [name, relation, color, bday || null, phone, notes, relation, id, userId]
+        [name, relation, color, bday || null, phone, notes, relation, shoe_number ?? null, dress_color ?? null, id, userId]
       );
     } catch {
       // Old schema fallback (pre-migration)
