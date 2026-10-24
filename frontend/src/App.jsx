@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { Suspense, lazy, useEffect, useMemo } from "react";
 import { useAuth } from "./contexts/AuthContext";
 import { useTheme } from "./hooks/useTheme";
 import { useApi } from "./lib/api";
@@ -7,7 +7,7 @@ import { displayName } from "./lib/format";
 import useNow from "./lib/useNow";
 import { DOCK, go, useRoute } from "./shell/route";
 import Orbit from "./shell/Orbit";
-import { Empty } from "./components/ui";
+import { Empty, Skeleton } from "./components/ui";
 import Auth from "./screens/Auth";
 import Today from "./screens/Today";
 import Activities from "./screens/Activities";
@@ -15,9 +15,11 @@ import Qaza from "./screens/Qaza";
 import Notes from "./screens/Notes";
 import Money from "./screens/Money";
 import People from "./screens/People";
-import Books from "./screens/Books";
 import Profile from "./screens/Profile";
 import Admin from "./screens/Admin";
+
+// react-pdf is heavy — load the Books screen on demand
+const Books = lazy(() => import("./screens/Books"));
 
 const AUTH_ROUTES = ["welcome", "login", "register"];
 
@@ -55,7 +57,7 @@ function App() {
     notes: () => <Notes sub={sub} />,
     expenses: () => <Money sub={sub} />,
     favourites: () => <People sub={sub} />,
-    books: () => <Books sub={sub} />,
+    books: () => <Suspense fallback={<Skeleton tiles={[["s8", 300], ["s4", 300], ["s12", 300]]} />}><Books sub={sub} /></Suspense>,
     profile: () => <Profile theme={theme} setTheme={setTheme} onSignOut={signOut} />,
     admin: () => <Admin />,
   };

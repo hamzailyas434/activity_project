@@ -4,6 +4,7 @@ import { isTokenExpired } from "../utils/jwt";
 
 const AuthContext = createContext();
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
@@ -46,7 +47,7 @@ export function AuthProvider({ children }) {
       // No stored token — try cookie-based session
       silentRefresh();
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- runs once on boot
 
   const silentRefresh = async () => {
     try {
@@ -105,7 +106,7 @@ export function AuthProvider({ children }) {
         method: "POST",
         credentials: "include",
       });
-    } catch (_) {
+    } catch {
       // Best-effort cookie clear
     }
   };

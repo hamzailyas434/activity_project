@@ -38,7 +38,7 @@ export async function apiFetch(url, options = {}, { token, refreshTokens, logout
 
   if (response.status === 401) {
     let body = {};
-    try { body = await response.clone().json(); } catch (_) {}
+    try { body = await response.clone().json(); } catch { /* not JSON */ }
 
     if (body.code === "TOKEN_EXPIRED") {
       if (!_refreshPromise) {

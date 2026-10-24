@@ -10,18 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@masaajid/qibla": "^1.0.0",
     "@tailwindcss/vite": "^4.2.2",
     "dompurify": "^3.3.3",
-    "gsap": "^3.14.2",
-    "lucide-react": "^1.8.0",
-    "prosemirror-docx": "^0.6.1",
-    "prosemirror-model": "^1.25.4",
-    "prosemirror-schema-basic": "^1.2.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-pdf": "^10.4.1",
-    "sweetalert2": "^11.26.24",
     "tailwindcss": "^4.2.2"
   },
   "devDependencies": {

@@ -82,3 +82,10 @@ mark.hl{background:var(--accent-soft);color:var(--accent);border-radius:4px;padd
 
 /* Money: ring + transactions side by side on landscape tablets */
 @media (min-width:1000px) and (max-width:1180px) and (orientation:landscape){.bento.money>.s5{grid-column:span 5}.bento.money>.s7{grid-column:span 7}}
+
+/* Phone acceptance: no sideways page scroll, ≥44px touch targets without changing the visual size */
+.page{overflow-x:clip}
+@media (pointer:coarse){
+  .btn.sm,.chip,.tick,.seg button,.cn-sw button,.pf-sw{position:relative}
+  .btn.sm::after,.chip::after,.tick::after,.seg button::after,.cn-sw button::after,.pf-sw::after{content:"";position:absolute;inset:-6px;min-width:44px;min-height:44px;left:50%;top:50%;transform:translate(-50%,-50%);width:100%;height:100%}
+}
