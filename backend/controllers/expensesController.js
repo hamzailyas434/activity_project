@@ -166,3 +166,87 @@ exports.deleteExpense = async (req, res) => {
     res.status(500).json({ error: "Failed to delete expense" });
   }
 };
+
+// ── Person ledger (person_ledger: amount = held, other_amount = pending) ──────
+const ledgerMissing = e => e.code === "ER_NO_SUCH_TABLE";
+const num = v => (v === "" || v == null || isNaN(Number(v)) ? 0 : Number(v));
+
+// GET /api/expenses/ledger?month=&year=
+exports.getLedger = async (req, res) => {
+  try {
+    // Latest entry per person up to the selected month (the ledger is a running balance)
+    const m = parseInt(req.query.month, 10), y = parseInt(req.query.year, 10);
+    if (!m || !y) return res.status(400).json({ error: "Month and year are required" });
+    const [rows] = await db.query(
+      `SELECT * FROM person_ledger WHERE user_id = ? AND (year * 12 + month) <= ?
+       ORDER BY year DESC, month DESC`,
+      [req.user.id, y * 12 + m]
+    );
+    const seen = new Set();
+    const latest = rows.filter(r => { const k = r.person_name.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; })
+      .map(r => ({ ...r, carried: r.month !== m || r.year !== y }))
+      .sort((a, b) => a.person_name.localeCompare(b.person_name));
+    res.json(latest);
+  } catch (error) {
+    if (ledgerMissing(error)) return res.json([]);
+    console.error("Error fetching ledger:", error);
+    res.status(500).json({ error: "Failed to fetch ledger" });
+  }
+};
+
+// POST /api/expenses/ledger { person_name, amount, other_amount, note, month, year } — upserts per person + month
+exports.upsertLedger = async (req, res) => {
+  try {
+    const { person_name, amount, other_amount, note = "", month, year } = req.body;
+    const name = String(person_name || "").trim();
+    if (!name) return res.status(400).json({ error: "Person is required" });
+    if (!month || !year) return res.status(400).json({ error: "Month and year are required" });
+    await db.query(
+      `INSERT INTO person_ledger (user_id, person_name, month, year, amount, other_amount, note)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE amount = VALUES(amount), other_amount = VALUES(other_amount), note = VALUES(note)`,
+      [req.user.id, name.slice(0, 200), month, year, num(amount), num(other_amount), note]
+    );
+    const [rows] = await db.query(
+      "SELECT * FROM person_ledger WHERE user_id = ? AND person_name = ? AND month = ? AND year = ?",
+      [req.user.id, name.slice(0, 200), month, year]
+    );
+    res.status(201).json(rows[0]);
+  } catch (error) {
+    if (ledgerMissing(error)) return res.status(503).json({ error: "Ledger not set up — run scripts/add_ledger_profiles_tables.js" });
+    console.error("Error saving ledger:", error);
+    res.status(500).json({ error: "Failed to save ledger entry" });
+  }
+};
+
+// PUT /api/expenses/ledger/:id
+exports.updateLedger = async (req, res) => {
+  try {
+    const { person_name, amount, other_amount, note = "" } = req.body;
+    const name = String(person_name || "").trim();
+    if (!name) return res.status(400).json({ error: "Person is required" });
+    const [r] = await db.query(
+      "UPDATE person_ledger SET person_name = ?, amount = ?, other_amount = ?, note = ? WHERE id = ? AND user_id = ?",
+      [name.slice(0, 200), num(amount), num(other_amount), note, req.params.id, req.user.id]
+    );
+    if (!r.affectedRows) return res.status(404).json({ error: "Ledger entry not found" });
+    const [rows] = await db.query("SELECT * FROM person_ledger WHERE id = ?", [req.params.id]);
+    res.json(rows[0]);
+  } catch (error) {
+    if (error.code === "ER_DUP_ENTRY") return res.status(400).json({ error: "That person already has an entry this month" });
+    console.error("Error updating ledger:", error);
+    res.status(500).json({ error: "Failed to update ledger entry" });
+  }
+};
+
+// DELETE /api/expenses/ledger/:id
+exports.deleteLedger = async (req, res) => {
+  try {
+    const [r] = await db.query("DELETE FROM person_ledger WHERE id = ? AND user_id = ?", [req.params.id, req.user.id]);
+    if (!r.affectedRows) return res.status(404).json({ error: "Ledger entry not found" });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting ledger:", error);
+    res.status(500).json({ error: "Failed to delete ledger entry" });
+  }
+};

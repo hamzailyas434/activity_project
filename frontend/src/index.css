@@ -79,3 +79,6 @@ mark.hl{background:var(--accent-soft);color:var(--accent);border-radius:4px;padd
 .rte .ProseMirror p{margin:2px 0}
 .rte .ProseMirror a,.rt a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
 .rte .ProseMirror:empty::before{content:attr(data-placeholder);color:var(--fg-4);pointer-events:none}
+
+/* Money: ring + transactions side by side on landscape tablets */
+@media (min-width:1000px) and (max-width:1180px) and (orientation:landscape){.bento.money>.s5{grid-column:span 5}.bento.money>.s7{grid-column:span 7}}
