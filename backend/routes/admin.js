@@ -10,6 +10,8 @@ router.patch('/users/:id/tabs', c.updateTabs);
 router.put('/users/:id/role', c.updateRole);
 router.patch('/users/:id/role', c.updateRole);
 router.post('/users/:id/unlock', c.unlockUser);
+router.post('/users/:id/demo-reset', c.resetDemo);
+router.post('/demo-accounts', c.createDemo);
 router.delete('/users/:id', requireOwner, c.deleteUser);
 router.get('/audit', requireOwner, c.getAudit);
 

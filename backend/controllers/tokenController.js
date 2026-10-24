@@ -50,7 +50,7 @@ async function issueTokens(user, res, ip, userAgent) {
   res.json({
     message: "Login successful",
     token: accessToken,
-    user: { id: user.id, username: user.username, email: user.email, role: user.role || 'user', hidden_tabs: user.hidden_tabs || [] },
+    user: { id: user.id, username: user.username, email: user.email, role: user.role || 'user', hidden_tabs: user.hidden_tabs || [], ...(user.is_demo ? { is_demo: 1 } : {}) },
   });
 }
 

@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const db = require('../config/database');
 
 const COLORS = ['iris','teal','mineral','ochre','dusk','fog'];
@@ -16,13 +18,14 @@ exports.listUsers = async (req, res) => {
       admins: "AND role IN ('owner','admin')",
       users: "AND role = 'user'",
       locked: 'AND lockout_until IS NOT NULL AND lockout_until > NOW()',
+      demo: 'AND is_demo = 1',
     }[role] || '';
     const where = `WHERE (? = '' OR username LIKE ? OR email LIKE ? OR first_name LIKE ? OR last_name LIKE ?) ${roleSql}`;
     const params = [q, like, like, like, like];
 
     const [rows] = await db.query(
       `SELECT id, username, email, first_name, last_name, role, hidden_tabs, last_active, created_at,
-              totp_enabled, lockout_until, failed_login_attempts
+              totp_enabled, lockout_until, failed_login_attempts, is_demo, demo_reset_at
        FROM users ${where}
        ORDER BY FIELD(role, 'owner', 'admin', 'user'), id ASC
        LIMIT ? OFFSET ?`,
@@ -103,7 +106,15 @@ exports.deleteUser = async (req, res) => {
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
     if (rows[0].role === 'owner') return res.status(403).json({ error: 'Cannot delete owner account' });
 
+    // Book tables have no foreign key to users, so clear them (and the files on disk) by hand
+    const [books] = await db.query('SELECT file_path FROM books WHERE user_id = ?', [targetId]);
+    for (const t of ['book_favourite_pages', 'book_highlights', 'book_page_notes', 'book_progress', 'books', 'reading_goals']) {
+      await db.query(`DELETE FROM ${t} WHERE user_id = ?`, [targetId]);
+    }
     await db.query('DELETE FROM users WHERE id = ?', [targetId]);
+    for (const b of books) {
+      try { fs.unlinkSync(path.join(__dirname, '..', b.file_path)); } catch { /* already gone */ }
+    }
     res.json({ success: true });
   } catch (err) {
     console.error('adminController.deleteUser error:', err);
@@ -165,5 +176,28 @@ exports.getAudit = async (req, res) => {
     if (err.code === 'ER_NO_SUCH_TABLE') return res.json({ rows: [], page: 1, limit: 50 });
     console.error('adminController.getAudit error:', err);
     res.status(500).json({ error: 'Failed to fetch audit log' });
+  }
+};
+
+// POST /api/admin/users/:id/demo-reset — put a demo account back to the demo data
+exports.resetDemo = async (req, res) => {
+  try {
+    await require("../utils/demoSeed").resetDemoUser(parseInt(req.params.id, 10));
+    res.json({ message: "Demo content reset" });
+  } catch (err) {
+    if (err.status === 400) return res.status(400).json({ error: err.message });
+    console.error("resetDemo error:", err);
+    res.status(500).json({ error: "Failed to reset demo content" });
+  }
+};
+
+// POST /api/admin/demo-accounts — add one more demo account to the pool
+exports.createDemo = async (req, res) => {
+  try {
+    const u = await require("../utils/demoSeed").createDemoUser();
+    res.status(201).json(u);
+  } catch (err) {
+    console.error("createDemo error:", err);
+    res.status(500).json({ error: "Failed to create demo account" });
   }
 };

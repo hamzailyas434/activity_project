@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Avatar, Empty, Head, Search, Seg, Skeleton, useUI } from "../components/ui";
+import { Avatar, Empty, Head, Icon, Search, Seg, Skeleton, useUI } from "../components/ui";
 import { useAuth } from "../contexts/AuthContext";
 import { useApi } from "../lib/api";
 import useLoad from "../lib/useLoad";
@@ -42,6 +42,15 @@ export default function Admin() {
     try { await api.patch(`/admin/users/${u.id}/role`, { role: up ? "admin" : "user" }); U(u.id, { role: up ? "admin" : "user" }); stats.reload(); toast(`${u.username} is now ${up ? "admin" : "user"}`); }
     catch (e) { toast(e.message, "err"); }
   };
+  const resetDemo = async u => {
+    if (!(await ask({ title: `Reset ${u.username}?`, body: "Everything in this demo account goes back to the original demo data. Anyone using it now sees the fresh copy.", ok: "Reset", danger: true }))) return;
+    try { await api.post(`/admin/users/${u.id}/demo-reset`); U(u.id, { demo_reset_at: new Date().toISOString() }); toast(u.username + " reset to demo data"); }
+    catch (e) { toast(e.message, "err"); }
+  };
+  const addDemo = async () => {
+    try { const r = await api.post("/admin/demo-accounts"); users.reload(); stats.reload(); toast(r.username + " added to the demo pool"); }
+    catch (e) { toast(e.message, "err"); }
+  };
   const unlock = async u => {
     if (!(await ask({ title: `Unlock ${u.username}?`, body: "Clears the lockout and failed sign-in count so they can sign in now.", ok: "Unlock" }))) return;
     try { await api.post(`/admin/users/${u.id}/unlock`); U(u.id, { locked: false, lockout_until: null, failed_login_attempts: 0 }); stats.reload(); toast(u.username + " unlocked"); }
@@ -63,7 +72,8 @@ export default function Admin() {
       {tab === "users" ? <>
         <div className="row wrap" style={{ marginBottom: 14, gap: 8 }}>
           <Search value={q} onChange={v => { setQ(v); setPage(1); }} label="Search users" placeholder="Username, name or email" style={{ flex: "1 1 240px", maxWidth: 360 }} />
-          {[["all", "All"], ["admins", "Admins"], ["users", "Users"], ["locked", "Locked"]].map(([x, l]) => <button type="button" key={x} className={"chip" + (rf === x ? " on" : "")} aria-pressed={rf === x} onClick={() => { setRf(x); setPage(1); }}>{l}</button>)}
+          {[["all", "All"], ["admins", "Admins"], ["users", "Users"], ["locked", "Locked"], ["demo", "Demo"]].map(([x, l]) => <button type="button" key={x} className={"chip" + (rf === x ? " on" : "")} aria-pressed={rf === x} onClick={() => { setRf(x); setPage(1); }}>{l}</button>)}
+          {rf === "demo" && <button type="button" className="btn sm primary" style={{ marginLeft: "auto" }} onClick={addDemo}><Icon n="plus" s={13} />Add demo account</button>}
         </div>
         {users.loading && !list.length ? <Skeleton tiles={[["s4", 280], ["s4", 280], ["s4", 280]]} />
           : users.error && !list.length ? <Empty title="Couldn't load users" body={users.error} action={<button type="button" className="btn primary" onClick={users.reload}>Try again</button>} />
@@ -81,14 +91,14 @@ export default function Admin() {
                         <b style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis" }}>{u.username}{self && <span className="faint"> · you</span>}</b>
                         <div className="mono faint" style={{ fontSize: 11.5, overflow: "hidden", textOverflow: "ellipsis" }}>{u.email || nm || "—"}</div>
                       </div>
-                      <span className={"pill " + (u.role === "owner" ? "red" : u.role === "admin" ? "warn" : "")}>{u.role}</span>
+                      {u.is_demo ? <span className="pill warn">demo</span> : <span className={"pill " + (u.role === "owner" ? "red" : u.role === "admin" ? "warn" : "")}>{u.role}</span>}
                     </div>
                     <div className="row wrap" style={{ gap: 6, margin: "14px 0" }}>
                       {u.online ? <span className="pill ok">● Online</span> : <span className="pill">Last {u.last_active ? ago(u.last_active) : "—"}</span>}
                       <span className={"pill " + (u.totp_enabled ? "info" : "")}>{u.totp_enabled ? "2FA on" : "No 2FA"}</span>
                       {u.locked && <span className="pill red">Locked</span>}
                       {!u.locked && u.failed_login_attempts > 0 && <span className="pill warn">{u.failed_login_attempts} failed</span>}
-                      <span className="pill">Joined {fmtDate(u.created_at)}</span>
+                      {u.is_demo ? <span className="pill">Reset {u.demo_reset_at ? ago(u.demo_reset_at) : "never"}</span> : <span className="pill">Joined {fmtDate(u.created_at)}</span>}
                     </div>
                     <div className="cap" style={{ marginBottom: 8 }}>Tab access · {TABS.length - TABS.filter(([t]) => u.hidden_tabs.includes(t)).length}/{TABS.length}</div>
                     <div className="row wrap" style={{ gap: 6 }}>
@@ -101,6 +111,7 @@ export default function Admin() {
                     </div>
                     <div className="row" style={{ marginTop: 16, justifyContent: "flex-end", gap: 6 }}>
                       {u.locked && <button type="button" className="btn sm" onClick={() => unlock(u)}>Unlock</button>}
+                      {!!u.is_demo && <button type="button" className="btn sm danger" onClick={() => resetDemo(u)}><Icon n="clock" s={13} />Reset content</button>}
                       {u.role === "owner" ? <span className="pill ink">Protected</span>
                         : lockedRole ? <span className="pill">{self ? "Your account" : "Owner only"}</span>
                           : <button type="button" className={"btn sm " + (u.role === "user" ? "primary" : "danger")} onClick={() => role(u)}>{u.role === "user" ? "Make admin" : "Revoke admin"}</button>}

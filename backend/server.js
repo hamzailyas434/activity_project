@@ -74,6 +74,7 @@ app.use(bodyParser.urlencoded({ extended: true, limit: "10mb" }));
 // Auth routes — tighter rate limit on login/register
 app.use("/api/users/login", authLimiter);
 app.use("/api/users/register", authLimiter);
+app.use("/api/users/demo-login", authLimiter);
 app.use("/api/users", userRoutes);
 
 // File upload — tightest rate limit
@@ -131,5 +132,13 @@ app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`API Base URL: http://localhost:${PORT}/api`);
 });
+
+// Demo accounts go back to the demo data 24 hours after their last reset (checked hourly)
+const { resetStaleDemos } = require("./utils/demoSeed");
+const demoTick = () => resetStaleDemos()
+  .then(n => { if (n) console.log(`Reset ${n} demo account(s)`); })
+  .catch(err => { if (err.code !== "ER_BAD_FIELD_ERROR") console.error("Demo reset job:", err.message); });
+setTimeout(demoTick, 15 * 1000);
+setInterval(demoTick, 60 * 60 * 1000).unref();
 
 module.exports = app;

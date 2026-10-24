@@ -250,10 +250,10 @@ exports.logout = async (req, res) => {
 exports.getCurrentUser = async (req, res) => {
   try {
     // Fetch full user data from database
-    const [users] = await db.query(
-      "SELECT id, username, first_name, last_name, email, profile_picture, created_at, role, hidden_tabs, totp_enabled FROM users WHERE id = ?",
-      [req.user.id]
-    );
+    const base = "id, username, first_name, last_name, email, profile_picture, created_at, role, hidden_tabs, totp_enabled";
+    // is_demo / demo_reset_at come from add_demo_accounts.js; keep working before it runs
+    const [users] = await db.query(`SELECT ${base}, is_demo, demo_reset_at FROM users WHERE id = ?`, [req.user.id])
+      .catch(err => { if (err.code !== "ER_BAD_FIELD_ERROR") throw err; return db.query(`SELECT ${base} FROM users WHERE id = ?`, [req.user.id]); });
 
     if (users.length === 0) {
       return res.status(404).json({ error: "User not found" });
