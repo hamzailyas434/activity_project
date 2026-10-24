@@ -1,23 +1,14 @@
 import { useState, useEffect } from "react";
 
-const COLOR_FAMILY_IDS = ["fog", "teal", "iris"];
-
-function readStoredColorFamily() {
-  const s = localStorage.getItem("colorFamily");
-  return COLOR_FAMILY_IDS.includes(s) ? s : "teal";
-}
-
+/* Ink (dark) is the default; Paper (light) is chosen in Profile → Appearance. Same localStorage('theme') key as v1. */
 export function useTheme() {
-  const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "dark");
-  const [colorFamily, setColorFamily] = useState(readStoredColorFamily);
+  const [theme, setTheme] = useState(() => (localStorage.getItem("theme") === "light" ? "light" : "dark"));
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     document.documentElement.classList.toggle("dark", theme === "dark");
-    document.documentElement.setAttribute("data-color-family", colorFamily);
     localStorage.setItem("theme", theme);
-    localStorage.setItem("colorFamily", colorFamily);
-  }, [theme, colorFamily]);
+  }, [theme]);
 
-  return { theme, setTheme, colorFamily, setColorFamily };
+  return { theme, setTheme };
 }

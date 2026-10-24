@@ -28,7 +28,8 @@ export async function apiFetch(url, options = {}, { token, refreshTokens, logout
   }
 
   const makeRequest = (t) => {
-    const headers = { "Content-Type": "application/json", ...options.headers };
+    const isForm = typeof FormData !== "undefined" && options.body instanceof FormData;
+    const headers = isForm ? { ...options.headers } : { "Content-Type": "application/json", ...options.headers };
     if (t) headers.Authorization = `Bearer ${t}`;
     return fetch(url, { ...options, headers, credentials: "include" });
   };

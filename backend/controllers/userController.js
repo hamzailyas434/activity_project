@@ -117,6 +117,7 @@ exports.login = async (req, res) => {
       const remainingMin = Math.ceil((new Date(user.lockout_until) - Date.now()) / 60000);
       return res.status(429).json({
         error: `Account locked. Try again in ${remainingMin} minute(s).`,
+        lockoutSeconds: Math.ceil((new Date(user.lockout_until) - Date.now()) / 1000),
       });
     }
 
@@ -133,6 +134,7 @@ exports.login = async (req, res) => {
         );
         return res.status(429).json({
           error: `Too many failed attempts. Account locked for 15 minutes.`,
+          lockoutSeconds: Math.ceil(LOCKOUT_MS / 1000),
         });
       }
       await db.query(
