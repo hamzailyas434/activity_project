@@ -19,7 +19,7 @@ export default function Orbit({ route, items, user, name, theme, setTheme, onSig
   return (
     <>
       <header className="top">
-        <div className="brand"><i /><span>Rhythm</span></div>
+        <a href="/dashboard" className="brand" aria-label="Rhythm — go to Today" onClick={e => { e.preventDefault(); go("dashboard"); }}><i /><span>Rhythm</span></a>
         <button type="button" className="cmd-btn" onClick={() => setCmd(true)}><Icon n="search" s={15} />Search or jump…<kbd>⌘K</kbd></button>
         <div className="top-r">
           <button type="button" className="btn ghost sm" onClick={onSignOut}><Icon n="logout" s={15} />Sign out</button>

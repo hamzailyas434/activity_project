@@ -8,6 +8,11 @@ export function useTheme() {
     document.documentElement.setAttribute("data-theme", theme);
     document.documentElement.classList.toggle("dark", theme === "dark");
     localStorage.setItem("theme", theme);
+    const light = theme === "light";
+    const icon = document.querySelector('link[rel="icon"]');
+    if (icon) icon.href = light ? "/rhythm-logo-light.svg" : "/rhythm-logo-dark.svg";
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", light ? "#F4F0E8" : "#08080A");
   }, [theme]);
 
   return { theme, setTheme };

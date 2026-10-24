@@ -41,7 +41,7 @@ function App() {
 
   if (loading) return <div className="boot" aria-busy="true" aria-label="Loading"><i /></div>;
 
-  if (!isAuthenticated) { const mode = onAuthRoute ? route : "welcome"; return <Auth key={mode} mode={mode} />; }
+  if (!isAuthenticated) { const mode = onAuthRoute ? route : "welcome"; return <Auth key={mode} mode={mode} theme={theme} setTheme={setTheme} />; }
   if (onAuthRoute) return null;
 
   const known = DOCK.some(n => n.id === route);
@@ -64,6 +64,12 @@ function App() {
 
   return (
     <Orbit route={r} items={items} user={user} name={name} theme={theme} setTheme={setTheme} onSignOut={signOut} todayLeft={todayLeft}>
+      {!!user?.is_demo && (
+        <div className="demo-bar" role="status">
+          <b>Demo account</b><span>Look around and change anything — it all resets every 24 hours.</span>
+          <button type="button" className="btn sm" onClick={() => { logout(); go("register"); }}>Create your own</button>
+        </div>
+      )}
       {blocked
         ? <Empty title="Not available" body="This tab is turned off for your account." action={<button type="button" className="btn primary" onClick={() => go("dashboard")}>Go to Today</button>} />
         : screens[r]()}

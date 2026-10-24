@@ -3,8 +3,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { API_BASE_URL } from "../config";
 import { Field, Icon, PwStrength, Toggle, pwOk } from "../components/ui";
 import { go } from "../shell/route";
+import Landing from "./Landing";
 
-const TONES = ["#E5432F", "#E9B44C", "#58B98B", "#7A9BF5", "#A98BF0"];
 
 async function post(path, body) {
   const res = await fetch(API_BASE_URL + path, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -14,33 +14,8 @@ async function post(path, body) {
 }
 const mmss = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
-function Welcome() {
-  return (
-    <div style={{ minHeight: "100vh", padding: "calc(clamp(20px,4vw,48px) + env(safe-area-inset-top)) clamp(16px,4vw,48px) clamp(20px,4vw,48px)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <div className="row sb"><div className="brand"><i /><span>Rhythm</span></div>
-        <div className="row"><button type="button" className="btn ghost" onClick={() => go("login")}>Sign in</button><button type="button" className="btn primary" onClick={() => go("register")}>Get started</button></div></div>
-      <div className="welcome" style={{ flex: 1, display: "grid", gridTemplateColumns: "minmax(0,1.3fr) minmax(0,1fr)", gap: 40, alignItems: "center", padding: "40px 0" }}>
-        <div>
-          <div className="hd" style={{ display: "block", margin: 0 }}><div className="eyebrow"><b>✦</b>Habits · prayers · notes · money</div></div>
-          <h1 className="serif" style={{ fontSize: "clamp(64px,10vw,168px)", lineHeight: 0.86 }}>Keep your days <em style={{ color: "var(--red)" }}>in orbit</em>.</h1>
-          <p style={{ fontSize: 18, color: "var(--fg-2)", maxWidth: 480, marginTop: 22, lineHeight: 1.5 }}>Routines, Qaza, notes worth remembering, family money and the books you are reading — one calm place.</p>
-          <div className="row wrap" style={{ marginTop: 28 }}>
-            <button type="button" className="btn red" style={{ height: 52, padding: "0 26px", fontSize: 15 }} onClick={() => go("register")}>Start free <Icon n="arrow" s={16} /></button>
-            <button type="button" className="btn" style={{ height: 52 }} onClick={() => go("login")}>I have an account</button>
-          </div>
-        </div>
-        <div aria-hidden="true" style={{ position: "relative", aspectRatio: "1", maxWidth: 520, width: "100%", justifySelf: "center" }}>
-          {TONES.map((c, i) => <i key={c} style={{ position: "absolute", inset: `${i * 9}%`, borderRadius: "50%", border: `${14 - i * 2}px solid ${c}`, borderTopColor: "transparent", animation: `orbit ${18 + i * 6}s linear infinite ${i % 2 ? "reverse" : ""}` }} />)}
-          <div style={{ position: "absolute", inset: "38%", borderRadius: "50%", background: "var(--fg)", color: "var(--bg)", display: "grid", placeContent: "center", textAlign: "center" }}>
-            <b className="serif" style={{ fontSize: "clamp(24px,4vw,40px)", lineHeight: 1 }}>88%</b><span className="mono" style={{ fontSize: 10 }}>today</span></div>
-        </div>
-      </div>
-      <style>{"@keyframes orbit{to{transform:rotate(360deg)}}@media (max-width:860px){.welcome{grid-template-columns:1fr!important}}"}</style>
-    </div>
-  );
-}
 
-export default function Auth({ mode }) {
+export default function Auth({ mode, theme, setTheme }) {
   const { login } = useAuth();
   const reg = mode === "register";
   const [f, setF] = useState({ username: "", email: "", password: "", confirmPassword: "" });
@@ -109,7 +84,17 @@ export default function Auth({ mode }) {
     finally { setBusy(false); }
   };
 
-  if (mode === "welcome") return <Welcome />;
+  // a fresh copy of the demo account, no password (backend picks a free one from the pool)
+  const demo = async () => {
+    if (busy) return;
+    setBusy(true); setErr("");
+    const { res, data } = await post("/users/demo-login", {});
+    if (res.ok && data.token) return finish(data, false);
+    setBusy(false);
+    if (mode === "welcome") go("login");
+    setErr(data.error || "The demo isn't available right now");
+  };
+  if (mode === "welcome") return <Landing theme={theme} setTheme={setTheme} demo={demo} />;
 
   const banner = (err || locked) && (
     <div role="alert" style={{ background: "var(--accent-soft)", color: "var(--err)", borderRadius: 16, padding: "12px 14px", fontWeight: 600, fontSize: 13 }}>
@@ -120,6 +105,7 @@ export default function Auth({ mode }) {
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: "calc(20px + env(safe-area-inset-top)) 16px 20px" }}>
       <div className="tile" style={{ width: "min(460px,100%)", padding: "clamp(24px,4vw,40px)", borderRadius: 32 }}>
+        <a href="/" className="brand" aria-label="Rhythm — home page" style={{ marginBottom: 18 }} onClick={e => { e.preventDefault(); go("welcome"); }}><i /><span>Rhythm</span></a>
         <button type="button" className="btn ghost sm" onClick={() => (step === "2fa" ? (setStep("cred"), setErr("")) : go("welcome"))} style={{ marginBottom: 16 }}><Icon n="chevL" s={14} />Back</button>
         {step === "2fa" ? (
           <form onSubmit={verify} className="stack" style={{ gap: 14 }}>
@@ -155,7 +141,9 @@ export default function Auth({ mode }) {
             {!reg && <div className="row" style={{ gap: 10, fontSize: 13, fontWeight: 600 }}><Toggle on={remember} label="Remember me" onChange={setRemember} /><span>Remember me</span></div>}
             <button className="btn red" type="submit" disabled={locked || busy} style={{ height: 52, fontSize: 15 }}>{busy ? "One moment…" : reg ? "Create account" : "Sign in"} <Icon n="arrow" s={16} /></button>
             <p className="muted" style={{ textAlign: "center", fontSize: 13 }}>{reg ? "Already have an account? " : "New here? "}
-              <a href={reg ? "#/login" : "#/register"} onClick={() => { setErr(""); setTouched({}); }}>{reg ? "Sign in" : "Create one"}</a></p>
+              <a href={reg ? "/login" : "/register"} onClick={e => { e.preventDefault(); setErr(""); setTouched({}); go(reg ? "login" : "register"); }}>{reg ? "Sign in" : "Create one"}</a></p>
+            <div className="row" style={{ gap: 10, color: "var(--fg-4)", fontSize: 11.5 }}><i style={{ flex: 1, height: 1, background: "var(--line)" }} />or<i style={{ flex: 1, height: 1, background: "var(--line)" }} /></div>
+            <button type="button" className="btn" disabled={busy} onClick={demo} style={{ height: 48 }}><Icon n="eye" s={16} />Explore the demo — no sign-up</button>
           </form>
         )}
       </div>
