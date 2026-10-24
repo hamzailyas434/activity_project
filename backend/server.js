@@ -16,7 +16,7 @@ const activityRoutes = require("./routes/activities");
 const completionRoutes = require("./routes/completions");
 const userRoutes = require("./routes/users");
 const { authenticateToken } = require("./middleware/auth");
-const { requireOwner } = require("./middleware/admin");
+const { requireAdmin } = require("./middleware/admin");
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -106,7 +106,7 @@ app.use("/api/day-journal", authenticateToken, require("./routes/dayJournal"));
 app.use(
   "/api/admin",
   authenticateToken,
-  requireOwner,
+  requireAdmin,
   require("./routes/admin")
 );
 app.use("/api/2fa", require("./routes/twoFactor"));

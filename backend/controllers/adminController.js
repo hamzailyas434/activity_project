@@ -3,26 +3,32 @@ const db = require('../config/database');
 const COLORS = ['iris','teal','mineral','ochre','dusk','fog'];
 const avatarColor = (id) => COLORS[((id - 1) % COLORS.length)];
 
-// GET /api/admin/users
+// GET /api/admin/users?q=&role=all|admins|users|locked&page=&limit=
 exports.listUsers = async (req, res) => {
   try {
-    const { search = '', page = 1, limit = 20 } = req.query;
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-    const like = `%${search}%`;
+    const q = String(req.query.q ?? req.query.search ?? '');
+    const role = String(req.query.role || 'all');
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+    const offset = (page - 1) * limit;
+    const like = `%${q}%`;
+    const roleSql = {
+      admins: "AND role IN ('owner','admin')",
+      users: "AND role = 'user'",
+      locked: 'AND lockout_until IS NOT NULL AND lockout_until > NOW()',
+    }[role] || '';
+    const where = `WHERE (? = '' OR username LIKE ? OR email LIKE ? OR first_name LIKE ? OR last_name LIKE ?) ${roleSql}`;
+    const params = [q, like, like, like, like];
 
     const [rows] = await db.query(
-      `SELECT id, username, email, role, hidden_tabs, last_active, created_at
-       FROM users
-       WHERE (? = '' OR username LIKE ? OR email LIKE ?)
-       ORDER BY id ASC
+      `SELECT id, username, email, first_name, last_name, role, hidden_tabs, last_active, created_at,
+              totp_enabled, lockout_until, failed_login_attempts
+       FROM users ${where}
+       ORDER BY FIELD(role, 'owner', 'admin', 'user'), id ASC
        LIMIT ? OFFSET ?`,
-      [search, like, like, parseInt(limit), offset]
+      [...params, limit, offset]
     );
-
-    const [countRows] = await db.query(
-      `SELECT COUNT(*) as total FROM users WHERE (? = '' OR username LIKE ? OR email LIKE ?)`,
-      [search, like, like]
-    );
+    const [countRows] = await db.query(`SELECT COUNT(*) as total FROM users ${where}`, params);
 
     const now = Date.now();
     const users = rows.map(u => {
@@ -33,11 +39,12 @@ exports.listUsers = async (req, res) => {
 
       const lastActive = u.last_active ? new Date(u.last_active).getTime() : 0;
       const online = (now - lastActive) < 5 * 60 * 1000;
+      const locked = !!u.lockout_until && new Date(u.lockout_until).getTime() > now;
 
-      return { ...u, hidden_tabs, online, color: avatarColor(u.id) };
+      return { ...u, hidden_tabs, online, locked, totp_enabled: !!u.totp_enabled, color: avatarColor(u.id) };
     });
 
-    res.json({ users, total: countRows[0].total, page: parseInt(page), limit: parseInt(limit) });
+    res.json({ users, total: countRows[0].total, page, limit });
   } catch (err) {
     console.error('adminController.listUsers error:', err);
     res.status(500).json({ error: 'Failed to fetch users' });
@@ -52,7 +59,9 @@ exports.getStats = async (req, res) => {
     const [[{ users }]] = await db.query("SELECT COUNT(*) as users FROM users WHERE role = 'user'");
     const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
     const [[{ online }]] = await db.query('SELECT COUNT(*) as online FROM users WHERE last_active > ?', [fiveMinAgo]);
-    res.json({ total, admins, users, online });
+    const [[{ locked }]] = await db.query('SELECT COUNT(*) as locked FROM users WHERE lockout_until > NOW()');
+    const [[{ totp }]] = await db.query('SELECT COUNT(*) as totp FROM users WHERE totp_enabled = 1');
+    res.json({ total, admins, users, online, locked, totp });
   } catch (err) {
     console.error('adminController.getStats error:', err);
     res.status(500).json({ error: 'Failed to fetch stats' });
@@ -72,6 +81,7 @@ exports.updateTabs = async (req, res) => {
     const [rows] = await db.query('SELECT role FROM users WHERE id = ?', [id]);
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
     if (rows[0].role === 'owner') return res.status(403).json({ error: 'Cannot edit owner tabs' });
+    if (rows[0].role === 'admin' && req.user.role !== 'owner') return res.status(403).json({ error: 'Only the owner can edit an admin' });
 
     await db.query('UPDATE users SET hidden_tabs = ? WHERE id = ?', [JSON.stringify(hidden_tabs), id]);
     res.json({ success: true, hidden_tabs });
@@ -113,11 +123,47 @@ exports.updateRole = async (req, res) => {
     const [rows] = await db.query('SELECT role FROM users WHERE id = ?', [id]);
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
     if (rows[0].role === 'owner') return res.status(403).json({ error: 'Cannot change owner role' });
+    // Admins may promote users; only the owner can demote an admin
+    if (rows[0].role === 'admin' && role === 'user' && req.user.role !== 'owner') return res.status(403).json({ error: 'Only the owner can revoke admin' });
 
     await db.query('UPDATE users SET role = ? WHERE id = ?', [role, id]);
     res.json({ success: true, role });
   } catch (err) {
     console.error('adminController.updateRole error:', err);
     res.status(500).json({ error: 'Failed to update role' });
+  }
+};
+
+// POST /api/admin/users/:id/unlock — clears lockout_until and failed_login_attempts
+exports.unlockUser = async (req, res) => {
+  try {
+    const [r] = await db.query(
+      'UPDATE users SET lockout_until = NULL, failed_login_attempts = 0 WHERE id = ?',
+      [req.params.id]
+    );
+    if (!r.affectedRows) return res.status(404).json({ error: 'User not found' });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('adminController.unlockUser error:', err);
+    res.status(500).json({ error: 'Failed to unlock user' });
+  }
+};
+
+// GET /api/admin/audit?page=&limit= (owner only)
+exports.getAudit = async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
+    const [rows] = await db.query(
+      `SELECT a.id, a.action, a.resource, a.ip_address, a.status_code, a.created_at, u.username
+       FROM audit_log a LEFT JOIN users u ON u.id = a.user_id
+       ORDER BY a.created_at DESC LIMIT ? OFFSET ?`,
+      [limit, (page - 1) * limit]
+    );
+    res.json({ rows, page, limit });
+  } catch (err) {
+    if (err.code === 'ER_NO_SUCH_TABLE') return res.json({ rows: [], page: 1, limit: 50 });
+    console.error('adminController.getAudit error:', err);
+    res.status(500).json({ error: 'Failed to fetch audit log' });
   }
 };
