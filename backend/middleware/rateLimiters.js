@@ -6,7 +6,8 @@ exports.globalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests. Please slow down." },
-  skip: (req) => req.path === "/api/health",
+  // Local dev: hot reload + v3 screens' parallel loads exhaust 300/15min quickly
+  skip: (req) => req.path === "/api/health" || process.env.NODE_ENV === "development",
 });
 
 // Per-IP limit for login/register — intentionally lenient since per-user
