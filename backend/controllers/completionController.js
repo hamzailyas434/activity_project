@@ -1,4 +1,5 @@
 const db = require("../config/database");
+const { ensureMonthRoutine } = require("../utils/monthRoutine");
 
 // Get completions for a specific month
 exports.getMonthlyCompletions = async (req, res) => {
@@ -12,6 +13,7 @@ exports.getMonthlyCompletions = async (req, res) => {
   try {
     // Get activities for this month's routine (or all if month_routines not used)
     let activities;
+    await ensureMonthRoutine(userId, year, month); // new month starts with last month's routines
     try {
       const [routineActivities] = await db.query(
         `SELECT a.* FROM activities a

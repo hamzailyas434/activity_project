@@ -1,4 +1,5 @@
 const db = require("../config/database");
+const { ensureMonthRoutine } = require("../utils/monthRoutine");
 
 // Get activities (optionally for a specific month's routine)
 exports.getAllActivities = async (req, res) => {
@@ -7,6 +8,7 @@ exports.getAllActivities = async (req, res) => {
     const { year, month } = req.query;
 
     if (year && month) {
+      await ensureMonthRoutine(userId, year, month); // new month starts with last month's routines
       try {
         const [rows] = await db.query(
           `SELECT a.* FROM activities a
@@ -77,6 +79,7 @@ exports.createActivity = async (req, res) => {
 
     if (year != null && month != null) {
       try {
+        await ensureMonthRoutine(userId, year, month); // so adding to a fresh month keeps last month's list
         const y = parseInt(year, 10);
         const m = parseInt(month, 10);
         const [maxOrder] = await db.query(
@@ -181,6 +184,7 @@ exports.deleteActivity = async (req, res) => {
       const y = parseInt(year, 10);
       const m = parseInt(month, 10);
       const activityIdNum = parseInt(id, 10);
+      await ensureMonthRoutine(userId, y, m); // removing from a fresh month keeps the rest of last month's list
 
       const connection = await db.getConnection();
       try {
