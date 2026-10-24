@@ -18,7 +18,8 @@ router.patch("/page-notes/:noteId/favourite", v.pageNoteIdRules, v.validate, c.t
 
 // Book CRUD
 router.get("/",                              c.listBooks);
-router.post("/",       booksUploadLimiter,  v.uploadBookRules, v.validate, c.uploadBook);
+// multipart: the file (and its form fields) are parsed inside uploadBook, so field checks live there too
+router.post("/",       booksUploadLimiter,  c.uploadBook);
 router.delete("/:id",  v.bookIdRules, v.validate, c.deleteBook);
 
 // Per-book sub-resources

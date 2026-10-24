@@ -12,16 +12,27 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `${unique}.pdf`);
+    cb(null, `${unique}.${isEpub(file) ? "epub" : "pdf"}`);
   },
 });
 
+// Browsers often send EPUBs as application/zip or octet-stream, so the extension decides; magic bytes are checked after upload
+const EPUB_MIMES = ["application/epub+zip", "application/zip", "application/x-zip-compressed", "application/octet-stream", ""];
+const isEpub = file => /\.epub$/i.test(file.originalname || "") && EPUB_MIMES.includes(file.mimetype || "");
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype === "application/pdf") {
+  if (file.mimetype === "application/pdf" || isEpub(file)) {
     cb(null, true);
   } else {
-    cb(new Error("Only PDF files are allowed"), false);
+    cb(new Error("Only PDF or EPUB files are allowed"), false);
   }
+};
+
+const formatOf = p => (/\.epub$/i.test(p || "") ? "epub" : "pdf");
+const MAGIC = { pdf: "%PDF", epub: "PK\u0003\u0004" };
+const magicOk = (fullPath, format) => {
+  const fd = fs.openSync(fullPath, "r");
+  try { const buf = Buffer.alloc(4); fs.readSync(fd, buf, 0, 4, 0); return buf.toString("latin1") === MAGIC[format]; }
+  finally { fs.closeSync(fd); }
 };
 
 const upload = multer({
@@ -50,7 +61,9 @@ const listBooks = async (req, res) => {
        ORDER BY b.created_at DESC`,
       [req.user.id, req.user.id]
     );
-    res.json(rows);
+    const [paths] = await db.query("SELECT id, file_path FROM books WHERE user_id = ?", [req.user.id]);
+    const fmt = Object.fromEntries(paths.map(r => [r.id, formatOf(r.file_path)]));
+    res.json(rows.map(r => ({ ...r, format: fmt[r.id] || "pdf" })));
   } catch (err) {
     console.error("listBooks error:", err);
     res.status(500).json({ error: "Failed to fetch books" });
@@ -59,19 +72,31 @@ const listBooks = async (req, res) => {
 
 // POST /api/books  (multipart)
 const uploadBook = [
-  upload.single("pdf"),
+  // wrong type / too large → 400 with a readable message instead of the generic 500
+  (req, res, next) => upload.single("pdf")(req, res, err => (err
+    ? res.status(400).json({ error: err.code === "LIMIT_FILE_SIZE" ? "File is larger than 100 MB" : err.message })
+    : next())),
   async (req, res) => {
     try {
-      if (!req.file) return res.status(400).json({ error: "PDF file required" });
-      const { title, author, total_pages } = req.body;
-      if (!title) return res.status(400).json({ error: "Title is required" });
+      if (!req.file) return res.status(400).json({ error: "PDF or EPUB file required" });
+      const format = formatOf(req.file.filename);
+      const title = String(req.body.title || "").trim(), author = String(req.body.author || "").trim();
+      const { total_pages } = req.body;
+      const bad = !magicOk(req.file.path, format) ? `That file isn't a valid ${format.toUpperCase()}`
+        : !title ? "Book title is required"
+        : title.length > 255 ? "Title must be under 255 characters"
+        : author.length > 255 ? "Author too long" : "";
+      if (bad) {
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({ error: bad });
+      }
 
       const filePath = `uploads/books/${req.file.filename}`;
       const [result] = await db.query(
         "INSERT INTO books (user_id, title, author, total_pages, file_path) VALUES (?, ?, ?, ?, ?)",
         [req.user.id, title, author || null, parseInt(total_pages) || 0, filePath]
       );
-      res.status(201).json({ id: result.insertId, title, author, total_pages: parseInt(total_pages) || 0, current_page: 1 });
+      res.status(201).json({ id: result.insertId, title, author, total_pages: parseInt(total_pages) || 0, current_page: 1, format });
     } catch (err) {
       console.error("uploadBook error:", err);
       res.status(500).json({ error: "Failed to upload book" });
@@ -113,6 +138,7 @@ const getBookFile = async (req, res) => {
 
     const stat = fs.statSync(fullPath);
     const range = req.headers.range;
+    const type = formatOf(rows[0].file_path) === "epub" ? "application/epub+zip" : "application/pdf";
 
     if (range) {
       const [startStr, endStr] = range.replace(/bytes=/, "").split("-");
@@ -123,13 +149,13 @@ const getBookFile = async (req, res) => {
         "Content-Range": `bytes ${start}-${end}/${stat.size}`,
         "Accept-Ranges": "bytes",
         "Content-Length": chunkSize,
-        "Content-Type": "application/pdf",
+        "Content-Type": type,
       });
       fs.createReadStream(fullPath, { start, end }).pipe(res);
     } else {
       res.writeHead(200, {
         "Content-Length": stat.size,
-        "Content-Type": "application/pdf",
+        "Content-Type": type,
         "Accept-Ranges": "bytes",
       });
       fs.createReadStream(fullPath).pipe(res);
