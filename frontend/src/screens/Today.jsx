@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Empty, Field, Head, Icon, Meter, Modal, Ring, Skeleton, TONE_HEX, useUI } from "../components/ui";
+import { Empty, Field, Head, Icon, Meter, Modal, Ring, Skeleton, TONE_HEX, useUI, cellColor } from "../components/ui";
+import { useAuth } from "../contexts/AuthContext";
 import { useApi } from "../lib/api";
 import useLoad from "../lib/useLoad";
 import useMonth, { dayPct } from "../lib/useMonth";
@@ -33,14 +34,18 @@ const goalParts = t => { const m = String(t).match(/^(\d{1,2} \w{3,9}):\s*(.*)$/
 export default function Today({ cur, name }) {
   const api = useApi();
   const { toast, ask } = useUI();
+  const { hiddenTabs = [] } = useAuth();
   const { format: money } = useCurrency();
+  // bottom row: drop tiles whose tab is turned off and let the rest share the width
+  const show = { books: !hiddenTabs.includes("books"), qaza: !hiddenTabs.includes("qaza-namaz"), money: !hiddenTabs.includes("expenses") };
+  const span = "s" + 12 / Math.max(1, Object.values(show).filter(Boolean).length);
   const now = useNow();
   const y = now.getFullYear(), m = now.getMonth() + 1, d = now.getDate();
   const py = m === 1 ? y - 1 : y, pm = m === 1 ? 12 : m - 1;
   const prev = useMonth(api, py, pm);
 
   const todos = useLoad(api, a => a.get(`/monthly-todos?month=${m}&year=${y}`), `${y}-${m}`, []);
-  const stickies = useLoad(api, a => a.get("/sticky-notes"), "", []);
+  const stickies = useLoad(api, async a => { const l = await a.get("/sticky-notes"); return Array.isArray(l) ? l.map(n => ({ ...n, text: String(n.text || "").replace(/\s*<br\s*\/?>\s*/gi, "\n") })) : l; }, "", []); // v1 stickies hold <br> line breaks
   const books = useLoad(api, a => a.get("/books/dashboard-summary"), "", null);
   const qaza = useLoad(api, a => a.get("/qaza-namaz"), "", null);
   const money_ = useLoad(api, async a => {
@@ -145,7 +150,7 @@ export default function Today({ cur, name }) {
                             <span dir="auto">{a.name}</span>
                             <NumIn value={c?.value ?? ""} type={a.type} label={a.name} onSave={val => setNum(a, val)} />
                           </label>
-                        : <button type="button" key={a.id} className="chip" aria-pressed={!!v} onClick={() => toggle(a)} style={v ? { background: "var(--red)", color: "#fff" } : {}}>
+                        : <button type="button" key={a.id} className="chip" aria-pressed={!!v} onClick={() => toggle(a)} style={v ? { background: cellColor(c.color) || "var(--red)", color: "#fff", boxShadow: "none", border: "1.5px solid transparent" } : { background: "transparent", boxShadow: "none", border: "1.5px solid var(--line-2)" }}>
                             {v && <Icon n="check" s={13} w={2.6} />}<span dir="auto">{a.name}</span></button>;
                     })}</div>
                   </div>
@@ -189,8 +194,9 @@ export default function Today({ cur, name }) {
             <div className="th"><div><div className="cap">Pinned</div><h3>Sticky <em>board</em></h3></div><button type="button" className="btn sm" onClick={() => setSticky({ text: "", tone: STICKY_T[stickyList.length % 5] })}><Icon n="plus" s={14} />Sticky</button></div>
             {stickies.loading && !stickyList.length ? <div className="skel" style={{ height: 150 }} /> : !stickyList.length ? <Empty title="Board is clear" body="Pin a thought with Quick add." /> : (
               <div style={{ display: "flex", gap: 12, overflowX: "auto", padding: "6px 2px 10px", scrollSnapType: "x mandatory" }}>{stickyList.map((n, i) =>
-                <button type="button" key={n.id} dir="auto" className={"tile ut t-" + stickyTone(n.color, i)} onClick={() => setSticky({ ...n, tone: stickyTone(n.color, i) })}
-                  style={{ flex: "0 0 180px", minHeight: 150, textAlign: "left", cursor: "pointer", scrollSnapAlign: "start", transform: `rotate(${(i % 3 - 1) * 1.6}deg)`, fontWeight: 700, fontSize: 14, lineHeight: 1.4, whiteSpace: "pre-wrap", alignItems: "flex-start", display: "block" }}>{n.text}</button>)}</div>
+                <button type="button" key={n.id} dir="auto" className="tile ut" onClick={() => setSticky({ ...n, tone: stickyTone(n.color, i) })}
+                  // filled with its colour: the ink pass turns t-gold/green/blue/violet tiles white with a thin top bar
+                  style={{ background: TONE_HEX[stickyTone(n.color, i)], color: stickyTone(n.color, i) === "red" ? "#fff" : "#111", flex: "0 0 180px", minHeight: 150, textAlign: "left", cursor: "pointer", scrollSnapAlign: "start", transform: `rotate(${(i % 3 - 1) * 1.6}deg)`, fontWeight: 700, fontSize: 14, lineHeight: 1.4, whiteSpace: "pre-wrap", alignItems: "flex-start", display: "block" }}>{n.text}</button>)}</div>
             )}
           </section>
 
@@ -223,20 +229,20 @@ export default function Today({ cur, name }) {
             </> : <p style={{ marginTop: 10 }} className="muted">{notes.loading ? "Loading…" : "Saved notes resurface here."}</p>}
           </section>
 
-          <section className="tile t-blue s4"><div className="row sb"><span className="cap">Reading</span><button type="button" className="btn sm" onClick={() => go("books")}>Read</button></div>
+          {show.books && <section className={"tile t-blue " + span}><div className="row sb"><span className="cap">Reading</span><button type="button" className="btn sm" onClick={() => go("books")}>Read</button></div>
             <div className="serif ut" dir="auto" style={{ fontSize: 34, lineHeight: 1, margin: "12px 0 4px" }}>{cb ? cb.title : books.loading ? "…" : "No book yet"}</div>
             {cb && <div style={{ fontSize: 12.5, fontWeight: 600 }}>p.{cb.current_page}{cb.total_pages ? ` of ${cb.total_pages}` : ""}</div>}
             {bk && <div className="row" style={{ marginTop: 16, gap: 12 }}>
               <Ring v={bk.pages_today / (bk.daily_pages_goal || 10)} size={64} w={8} color="var(--blue)" track="var(--bg-2)"><b className="mono" style={{ fontSize: 13 }}>{bk.pages_today}</b></Ring>
               <span style={{ fontSize: 13, fontWeight: 600 }}>{bk.pages_today} of {bk.daily_pages_goal} pages today<br /><span style={{ opacity: 0.7 }}>{Math.max(0, bk.daily_pages_goal - bk.pages_today)} to go</span></span>
             </div>}
-          </section>
+          </section>}
 
-          <section className="tile t-green s4"><div className="row sb"><span className="cap">Qaza remaining</span><button type="button" className="btn sm" onClick={() => go("qaza-namaz")}>Log</button></div>
+          {show.qaza && <section className={"tile t-green " + span}><div className="row sb"><span className="cap">Qaza remaining</span><button type="button" className="btn sm" onClick={() => go("qaza-namaz")}>Log</button></div>
             <div className="big" style={{ marginTop: 12 }}>{qz ? qz.r.toLocaleString() : "—"}</div>
-            <div style={{ fontSize: 12.5, fontWeight: 600, marginTop: 8 }}>{qz ? `${Math.max(0, qz.o - qz.r).toLocaleString()} made up · across five prayers` : qaza.loading ? "Loading…" : "Set it up in Qaza"}</div></section>
+            <div style={{ fontSize: 12.5, fontWeight: 600, marginTop: 8 }}>{qz ? `${Math.max(0, qz.o - qz.r).toLocaleString()} made up · across five prayers` : qaza.loading ? "Loading…" : "Set it up in Qaza"}</div></section>}
 
-          <section className="tile s4"><div className="row sb"><span className="cap">Income left · {MON[m - 1]}</span><button type="button" className="btn sm" onClick={() => go("expenses")}>Money</button></div>
+          {show.money && <section className={"tile " + span}><div className="row sb"><span className="cap">Income left · {MON[m - 1]}</span><button type="button" className="btn sm" onClick={() => go("expenses")}>Money</button></div>
             {income > 0 ? <>
               <div className="big" style={{ marginTop: 12, color: left < 0 ? "var(--err)" : undefined }}>{Math.abs(left) >= 1000 ? Math.round(left / 1000) : left}<small>{Math.abs(left) >= 1000 ? "k" : ""}</small></div>
               <Meter v={spent / income} style={{ marginTop: 14 }} />
@@ -245,7 +251,7 @@ export default function Today({ cur, name }) {
               <div className="big" style={{ marginTop: 12 }}>{Math.round(spent / 1000)}<small>k spent</small></div>
               <div className="mono muted" style={{ fontSize: 11.5, marginTop: 8 }}>{money_.loading ? "Loading…" : "Set this month's income in Money"}</div>
             </>}
-          </section>
+          </section>}
         </div>
       )}
       {sticky && <StickyEdit note={sticky} stickies={stickies} onClose={() => setSticky(null)} />}

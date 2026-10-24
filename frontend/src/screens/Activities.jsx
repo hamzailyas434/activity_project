@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import { Empty, Field, Head, Icon, Modal, Scrim, Seg, Skeleton, TONES, TONE_HEX, useUI } from "../components/ui";
+import { Empty, Field, Head, Icon, Modal, Scrim, Seg, Skeleton, TONES, TONE_HEX, useUI, cellColor } from "../components/ui";
 import { useApi } from "../lib/api";
 import useLoad from "../lib/useLoad";
 import useMonth, { dayPct, parseNotes } from "../lib/useMonth";
@@ -86,7 +86,7 @@ export default function Activities({ cur, sub }) {
       );
     }
     const done = !!c?.done;
-    const bg = done ? (c.color || "var(--red)") : fut ? "transparent" : "var(--bg-2)";
+    const bg = done ? (cellColor(c.color) || "var(--red)") : fut ? "transparent" : "var(--bg-2)";
     return (
       <button type="button" key={key} aria-label={`${a.name} ${label(d)}${done ? ", done" : ""}${nt ? ", has notes" : ""}`} aria-pressed={done} disabled={fut}
         title={isVal(a) && c?.value ? `${c.value} · double-click for notes` : "Click to tick · double-click for notes"}
@@ -160,7 +160,7 @@ export default function Activities({ cur, sub }) {
           {view === "month" && (
             <section className="tile">
               <div style={{ overflowX: "auto" }}>
-                <div style={{ display: "grid", gridTemplateColumns: `minmax(140px,1fr) repeat(${dim},22px)`, gap: "10px 4px", minWidth: 140 + dim * 26, alignItems: "center" }}>
+                <div style={{ display: "grid", gridTemplateColumns: `minmax(120px,200px) repeat(${dim},minmax(22px,1fr))`, gap: "10px 4px", minWidth: 120 + dim * 26, alignItems: "center", justifyItems: "center" }}>
                   <span />
                   {Array.from({ length: dim }, (_, i) => {
                     const isT = isCur && i + 1 === td;
@@ -169,14 +169,14 @@ export default function Activities({ cur, sub }) {
                   })}
                   {acts.map(a => (
                     <Fragment key={a.id}>
-                      <b dir="auto" style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.name}</b>
+                      <b dir="auto" title={a.name} style={{ fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", justifySelf: "stretch", paddingRight: 8 }}>{a.name}</b>
                       {Array.from({ length: dim }, (_, i) => cellEl(a, i + 1, false, i))}
                     </Fragment>
                   ))}
-                  <span className="cap">Day %</span>
+                  <span className="cap" style={{ justifySelf: "start" }}>Day %</span>
                   {Array.from({ length: dim }, (_, i) => {
                     const p = i < lastDay ? dayPct(acts, comp, i + 1) : 0;
-                    return <i key={i} title={Math.round(p * 100) + "%"} style={{ height: 40, borderRadius: 6, background: `linear-gradient(to top,var(--red) ${p * 100}%,var(--bg-2) ${p * 100}%)` }} />;
+                    return <i key={i} title={Math.round(p * 100) + "%"} style={{ height: 40, width: "100%", maxWidth: 28, borderRadius: 6, background: `linear-gradient(to top,var(--red) ${p * 100}%,var(--bg-2) ${p * 100}%)` }} />;
                   })}
                 </div>
               </div>
@@ -234,6 +234,13 @@ function CellNotes({ a, d, y, m, c, mo, onClose }) {
       toast(`Saved to ${a.name} · ${d} ${MON[m - 1]}`); onClose();
     } catch (e) { toast(e.message, "err"); setBusy(false); }
   };
+  // Wipe this cell's notes and colour in one go (done state stays)
+  const clear = async () => {
+    if (!(await ask({ title: "Clear this cell?", body: `All notes and the colour on ${a.name} · ${d} ${MON[m - 1]} will be removed.`, ok: "Clear", danger: true }))) return;
+    setBusy(true);
+    try { await mo.saveCell(a, d, { notes: [], color: "" }); toast("Notes and colour cleared"); onClose(); }
+    catch (e) { toast(e.message, "err"); setBusy(false); }
+  };
   const tone = toneOf(color);
   const tc = color || "var(--line-2)";
   return (
@@ -271,6 +278,7 @@ function CellNotes({ a, d, y, m, c, mo, onClose }) {
           </div>
         </div>
         <footer className="cn-f">
+          {(init.list.length > 0 || !!init.color) && <button type="button" className="btn danger" style={{ marginRight: "auto" }} disabled={busy} onClick={clear}><Icon n="trash" s={14} />Clear</button>}
           <button type="button" className="btn" onClick={close}>Cancel</button>
           <button type="button" className="btn red" disabled={busy} onClick={save}><Icon n="check" s={14} w={2.4} />Save</button>
         </footer>
@@ -294,7 +302,7 @@ function Journal({ d, y, m, acts, comp, past, text, onSaved, onClose }) {
   return (
     <Modal kicker={`${dt.toLocaleDateString("en-GB", { weekday: "long" })} · ${p == null ? "upcoming" : Math.round(p * 100) + "% done"}`} title={`${d} ${MONTHS[m - 1]}`} onClose={close}
       foot={<><button type="button" className="btn" onClick={close}>Close</button><button type="button" className="btn primary" disabled={busy || t === text} onClick={save}>Save</button></>}>
-      {p != null && <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{acts.map(a => <span key={a.id} dir="auto" className={"pill" + (comp[`${d}-${a.id}`]?.done ? " red" : "")}>{a.name}</span>)}</div>}
+      {p != null && <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{acts.map(a => { const c = comp[`${d}-${a.id}`], col = cellColor(c?.color); return <span key={a.id} dir="auto" className={"pill" + (c?.done ? " red" : "")} style={c?.done && col ? { background: `color-mix(in oklab, ${col} 22%, transparent)`, color: col } : undefined}>{a.name}</span>; })}</div>}
       <Field label="Journal"><textarea className="input" dir="auto" autoFocus value={t} onChange={e => setT(e.target.value)} placeholder="How did the day go?" style={{ minHeight: 160 }} /></Field>
     </Modal>
   );

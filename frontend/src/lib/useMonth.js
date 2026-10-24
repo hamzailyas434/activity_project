@@ -6,7 +6,7 @@ import { ymd } from "./format";
 export function parseNotes(note) {
   if (!note) return [];
   if (Array.isArray(note)) return note;
-  try { const j = JSON.parse(note); return Array.isArray(j) ? j.map(String) : [String(note)]; }
+  try { const j = JSON.parse(note); return Array.isArray(j) ? j.map(String).filter(x => x.trim()) : [String(note)]; }
   catch { return String(note).trim() ? [String(note)] : []; }
 }
 
