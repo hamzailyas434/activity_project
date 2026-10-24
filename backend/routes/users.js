@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/userController");
 const tokenController = require("../controllers/tokenController");
+const account = require("../controllers/accountController");
 const { authenticateToken } = require("../middleware/auth");
 const v = require("../middleware/validators");
 
@@ -17,5 +18,10 @@ router.get("/me",           authenticateToken, userController.getCurrentUser);
 router.get("/activity-log", authenticateToken, userController.getActivityLog);
 router.put("/profile",  authenticateToken, v.updateProfileRules, v.validate, userController.updateProfile);
 router.put("/password", authenticateToken, v.changePasswordRules, v.validate, userController.changePassword);
+router.get("/sessions",              authenticateToken, account.listSessions);
+router.post("/sessions/:id/revoke",  authenticateToken, account.revokeSession);
+router.get("/settings",              authenticateToken, account.getSettings);
+router.put("/settings",              authenticateToken, account.updateSettings);
+router.get("/export.csv",            authenticateToken, account.exportCsv);
 
 module.exports = router;

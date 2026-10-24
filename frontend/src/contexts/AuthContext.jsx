@@ -142,6 +142,16 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Merge fresh profile fields into the session (same storage that holds the token)
+  const updateUser = patch => {
+    setUser(u => {
+      const next = { ...u, ...patch };
+      const store = localStorage.getItem("user") ? localStorage : sessionStorage;
+      try { store.setItem("user", JSON.stringify(next)); } catch { /* quota (large photo) — memory copy still updates */ }
+      return next;
+    });
+  };
+
   const role = user?.role || "user";
   const hiddenTabs = Array.isArray(user?.hidden_tabs) ? user.hidden_tabs : [];
 
@@ -150,6 +160,7 @@ export function AuthProvider({ children }) {
     token,
     login,
     logout,
+    updateUser,
     refreshTokens,
     isAuthenticated: !!user && !!token,
     loading,

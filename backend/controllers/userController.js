@@ -251,7 +251,7 @@ exports.getCurrentUser = async (req, res) => {
   try {
     // Fetch full user data from database
     const [users] = await db.query(
-      "SELECT id, username, first_name, last_name, email, profile_picture, created_at, role, hidden_tabs FROM users WHERE id = ?",
+      "SELECT id, username, first_name, last_name, email, profile_picture, created_at, role, hidden_tabs, totp_enabled FROM users WHERE id = ?",
       [req.user.id]
     );
 
