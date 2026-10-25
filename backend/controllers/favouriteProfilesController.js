@@ -120,6 +120,21 @@ exports.deleteProfile = async (req, res) => {
 
 // ── Categories (Preferences) ──────────────────────────────────────────────────
 
+// Every category name this user has used on anyone, most used first (custom chips in the UI)
+exports.getPrefCategories = async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT category, COUNT(*) AS n FROM favourite_profile_categories
+       WHERE user_id = ? AND category <> '' GROUP BY category ORDER BY n DESC, category ASC`,
+      [req.user.id]
+    );
+    res.json(rows.map(r => r.category));
+  } catch (error) {
+    console.error("Error fetching preference categories:", error);
+    res.status(500).json({ error: "Failed to fetch categories" });
+  }
+};
+
 exports.getCategories = async (req, res) => {
   try {
     const userId = req.user.id;

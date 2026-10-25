@@ -6,7 +6,7 @@ import useLoad from "../lib/useLoad";
 import { fmtDate, isoDate, toDate } from "../lib/format";
 import { useCurrency } from "../hooks/useCurrency";
 import { go } from "../shell/route";
-import { usePeople } from "../lib/people";
+import { usePeople, usePrefCats } from "../lib/people";
 
 const RELS = ["Spouse", "Parent", "Sibling", "Child", "Friend", "Colleague", "Other"];
 const PREF_K = ["Shoes", "Perfume", "Books", "Jewellery", "Clothes", "Gadgets"];
@@ -72,26 +72,13 @@ export function PersonSheet({ p, loading, today, onChanged }) {
   const id = p?.id;
   const prefs = useLoad(api, a => (id ? a.get(`/favourite-profiles/${id}/categories`) : []), String(id), []);
   const gifts = useLoad(api, a => (id ? a.get(`/favourite-profiles/${id}/records`) : []), String(id), []);
-  const [tab, setTab] = useState("prefs"), [k, setK] = useState(""), [v, setV] = useState(""), [g, setG] = useState({ n: "", d: today, a: "" }), [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState("prefs"), [g, setG] = useState({ n: "", d: today, a: "" }), [busy, setBusy] = useState(false);
   const close = () => go("favourites");
   if (!p) return <Drawer title={loading ? "Loading…" : "Not found"} onClose={close}>{!loading && <Empty title="Person not found" body="They may have been removed." />}</Drawer>;
 
-  const pl = Array.isArray(prefs.data) ? prefs.data : [], gl = Array.isArray(gifts.data) ? gifts.data : [];
-  const grouped = Object.entries(pl.reduce((m, x) => { const c = String(x.category || "Other").trim() || "Other"; (m[c] = m[c] || []).push(x); return m; }, {}));
+  const gl = Array.isArray(gifts.data) ? gifts.data : [];
   const tone = toneOf(p.color);
 
-  const addPref = async () => {
-    if (!k.trim() || busy) return;
-    setBusy(true);
-    try { const r = await api.post(`/favourite-profiles/${id}/categories`, { category: k.trim(), notes: v.trim(), sort_order: pl.length }); prefs.setData(l => [...l, r]); setV(""); onChanged(); }
-    catch (e) { toast(e.message, "err"); }
-    finally { setBusy(false); }
-  };
-  const delPref = async x => {
-    if (!(await ask({ title: "Remove preference?", body: `${x.category}${x.notes ? " · " + x.notes : ""}`, ok: "Remove", danger: true }))) return;
-    try { await api.del(`/favourite-profiles/categories/${x.id}`); prefs.setData(l => l.filter(y => y.id !== x.id)); onChanged(); }
-    catch (e) { toast(e.message, "err"); }
-  };
   const logGift = async () => {
     if (!g.n.trim() || busy) return;
     setBusy(true);
@@ -118,24 +105,7 @@ export function PersonSheet({ p, loading, today, onChanged }) {
         <button type="button" className="btn primary" onClick={() => go(`favourites/${id}/edit`)}><Icon n="edit" s={14} />Edit</button></>}>
       <Seg value={tab} onChange={setTab} label="Section" style={{ flexShrink: 0 }} options={[["prefs", "Preferences"], ["gifts", "Gifts"], ["notes", "Notes"], ["info", "Details"]]} />
 
-      {tab === "prefs" && <>
-        {prefs.loading && !pl.length ? <div className="skel" style={{ height: 120 }} /> : !grouped.length ? <Empty title="No preferences" body="Sizes, brands, wishes…" />
-          : grouped.map(([cat, items]) => (
-            <div key={cat} className="tile sunk" style={{ padding: 16 }}>
-              <b className="serif ut" dir="auto" style={{ fontSize: 22 }}>{cat}</b>
-              <div className="row wrap" style={{ gap: 6, marginTop: 8 }}>{items.map(x => (
-                <span key={x.id} className="chip" style={{ boxShadow: "none" }}><span dir="auto" className="ut">{x.notes || "—"}</span>
-                  <button type="button" aria-label={`Remove ${cat} ${x.notes || ""}`} onClick={() => delPref(x)} style={{ border: "none", background: "none", cursor: "pointer", display: "grid", color: "inherit" }}><Icon n="x" s={12} /></button></span>
-              ))}</div>
-            </div>
-          ))}
-        <div className="row wrap" style={{ alignItems: "flex-end" }}>
-          <Field label="Category" style={{ flex: "1 1 140px" }}><input className="input" dir="auto" value={k} list="pref-k" onChange={e => setK(e.target.value)} placeholder="Shoes" /></Field>
-          <datalist id="pref-k">{[...new Set([...PREF_K, ...pl.map(x => x.category)])].map(x => <option key={x} value={x} />)}</datalist>
-          <Field label="Detail" style={{ flex: "2 1 180px" }}><input className="input" dir="auto" value={v} onChange={e => setV(e.target.value)} onKeyDown={e => e.key === "Enter" && addPref()} placeholder="39.7 EU" /></Field>
-          <button type="button" className="btn primary" disabled={!k.trim() || busy} onClick={addPref}>Add</button>
-        </div>
-      </>}
+      {tab === "prefs" && <PrefList id={id} prefs={prefs} onChanged={onChanged} />}
 
       {tab === "gifts" && <>
         {gifts.loading && !gl.length ? <div className="skel" style={{ height: 120 }} /> : !gl.length ? <Empty title="No gifts yet" body="Log gifts to avoid repeats and plan ahead." />
@@ -179,6 +149,7 @@ export function PersonForm({ person, onClose, onSaved }) {
   const { toast, ask } = useUI();
   const editing = !!person;
   const existing = useLoad(api, a => (person ? a.get(`/favourite-profiles/${person.id}/categories`) : []), String(person?.id || 0), []);
+  const cats = usePrefCats();
   const mk = p => ({
     name: p?.name || "", rel: p?.relation || p?.category || "", tone: toneOf(p?.color, 0), bday: dstr(p?.bday), phone: p?.phone || "",
     shoe: p?.shoe_number || "", dress: p?.dress_color || "", notes: p?.notes || "",
@@ -247,7 +218,7 @@ export function PersonForm({ person, onClose, onSaved }) {
             <div className="pf-grid">{I("bday", "Birthday", "date")}{I("phone", "Phone", "tel", "+92 …")}{I("shoe", "Shoe size", "text", "39.7 EU")}{I("dress", "Dress colour", "text", "Black")}</div>
           </section>
           <section className="pf-sec"><div className="pf-h"><b>03</b>Likes &amp; wishes</div>
-            <div className="row wrap" style={{ gap: 6 }}>{PREF_K.map(k => <button type="button" key={k} className={"chip" + (pk === k ? " on" : "")} onClick={() => setPk(k)}>{k}</button>)}</div>
+            <div className="row wrap" style={{ gap: 6 }}>{[...new Map([...PREF_K, ...cats.list].map(c => [catKey(c), c])).values()].map(k => <button type="button" key={k} dir="auto" className={"chip" + (catKey(pk) === catKey(k) ? " on" : "")} onClick={() => setPk(k)}>{k}</button>)}</div>
             <div className="pf-add">
               <input className="input" dir="auto" aria-label="Category" placeholder="Category" value={pk} onChange={e => setPk(e.target.value)} />
               <input className="input" dir="auto" aria-label="Detail" placeholder="Detail — size, brand, colour…" value={pv} onChange={e => setPv(e.target.value)} onKeyDown={e => e.key === "Enter" && addPref()} />
@@ -386,5 +357,121 @@ function PersonNoteEdit({ id, note, onCancel, onSaved }) {
         <button type="button" className="btn primary" disabled={!body.trim() || busy} onClick={save}><Icon n="check" s={14} />{busy ? "Saving…" : "Save note"}</button>
       </div>
     </div>
+  );
+}
+
+/* Preferences: one row per category (label · values). Click a value to copy it; categories can be custom, renamed or removed. */
+const catKey = c => String(c || "").trim().toLowerCase();
+
+function PrefList({ id, prefs, onChanged }) {
+  const api = useApi();
+  const { toast, ask } = useUI();
+  const cats = usePrefCats();
+  const pl = Array.isArray(prefs.data) ? prefs.data : [];
+  const groups = Object.values(pl.reduce((m, x) => {
+    const c = String(x.category || "Other").trim() || "Other";
+    (m[catKey(c)] = m[catKey(c)] || { cat: c, items: [] }).items.push(x);
+    return m;
+  }, {}));
+  const [k, setK] = useState(""), [v, setV] = useState(""), [custom, setCustom] = useState(false), [busy, setBusy] = useState(false);
+  const [ren, setRen] = useState(null); // { key, name } while renaming a category
+  const detail = useRef(null);
+  const options = [...new Map([...PREF_K, ...cats.list, ...groups.map(g => g.cat)].map(c => [catKey(c), c])).values()];
+
+  const pickCat = c => { setK(c); setCustom(false); setTimeout(() => detail.current?.focus(), 0); };
+  const add = async () => {
+    const c = k.trim(), val = v.trim();
+    if (!c || busy) return;
+    setBusy(true);
+    try {
+      // a category added without a detail is a placeholder: fill it instead of adding a second row
+      const empty = pl.find(x => catKey(x.category) === catKey(c) && !String(x.notes || "").trim());
+      if (empty && val) {
+        const r = await api.put(`/favourite-profiles/categories/${empty.id}`, { category: empty.category, notes: val });
+        prefs.setData(l => l.map(x => (x.id === r.id ? r : x)));
+      } else if (!empty || val) {
+        const r = await api.post(`/favourite-profiles/${id}/categories`, { category: c, notes: val, sort_order: pl.length });
+        prefs.setData(l => [...l, r]);
+      }
+      setV(""); setCustom(false); cats.reload(); onChanged();
+    } catch (e) { toast(e.message, "err"); }
+    finally { setBusy(false); }
+  };
+  const delOne = async x => {
+    if (!(await ask({ title: "Remove this?", body: `${x.category} · ${x.notes}`, ok: "Remove", danger: true }))) return;
+    try { await api.del(`/favourite-profiles/categories/${x.id}`); prefs.setData(l => l.filter(y => y.id !== x.id)); onChanged(); }
+    catch (e) { toast(e.message, "err"); }
+  };
+  const delGroup = async g => {
+    if (!(await ask({ title: `Remove ${g.cat}?`, body: g.items.length > 1 ? `All ${g.items.length} details in this category will be deleted.` : "This category will be deleted.", ok: "Remove", danger: true }))) return;
+    try {
+      for (const x of g.items) await api.del(`/favourite-profiles/categories/${x.id}`);
+      prefs.setData(l => l.filter(y => !g.items.some(x => x.id === y.id))); cats.reload(); onChanged();
+    } catch (e) { toast(e.message, "err"); prefs.reload(); }
+  };
+  const rename = async g => {
+    const name = ren?.name.trim();
+    setRen(null);
+    if (!name || name === g.cat) return;
+    try {
+      const out = [];
+      for (const x of g.items) out.push(await api.put(`/favourite-profiles/categories/${x.id}`, { category: name, notes: x.notes || "" }));
+      prefs.setData(l => l.map(y => out.find(o => o.id === y.id) || y)); cats.reload();
+    } catch (e) { toast(e.message, "err"); prefs.reload(); }
+  };
+  const copy = async t => {
+    try { await navigator.clipboard.writeText(t); toast("Copied"); } catch { toast("Couldn't copy", "err"); }
+  };
+
+  return (
+    <>
+      {prefs.loading && !pl.length ? <div className="skel" style={{ height: 120 }} />
+        : !groups.length ? <Empty title="No preferences" body="Sizes, brands, wishes, account details — anything worth remembering." />
+        : (
+          <div className="pref-list">
+            {groups.map(g => {
+              const key = catKey(g.cat), vals = g.items.filter(x => String(x.notes || "").trim());
+              return (
+                <div key={key} className="pref-row">
+                  <div className="pref-cat">
+                    {ren?.key === key
+                      ? <input className="input" autoFocus dir="auto" aria-label={`Rename ${g.cat}`} value={ren.name} maxLength={200}
+                          onChange={e => setRen({ key, name: e.target.value })} onBlur={() => rename(g)}
+                          onKeyDown={e => { if (e.key === "Enter") rename(g); if (e.key === "Escape") setRen(null); }} />
+                      : <span className="cap ut" dir="auto" title={g.cat}>{g.cat}</span>}
+                  </div>
+                  <div className="pref-vals">
+                    {vals.length ? vals.map(x => (
+                      <span key={x.id} className="pref-v">
+                        <button type="button" className="pref-t ut" dir="auto" title="Copy" onClick={() => copy(x.notes)}>{x.notes}</button>
+                        <button type="button" className="pref-x" aria-label={`Remove ${g.cat} ${x.notes}`} onClick={() => delOne(x)}><Icon n="x" s={11} /></button>
+                      </span>
+                    )) : <span className="faint" style={{ fontSize: 12.5 }}>No detail yet</span>}
+                  </div>
+                  <div className="pref-act">
+                    <button type="button" className="btn sm icon ghost" aria-label={`Add to ${g.cat}`} title="Add detail" onClick={() => pickCat(g.cat)}><Icon n="plus" s={13} /></button>
+                    <button type="button" className="btn sm icon ghost" aria-label={`Rename ${g.cat}`} title="Rename" onClick={() => setRen({ key, name: g.cat })}><Icon n="edit" s={13} /></button>
+                    <button type="button" className="btn sm icon ghost danger" aria-label={`Remove ${g.cat}`} title="Remove category" onClick={() => delGroup(g)}><Icon n="trash" s={13} /></button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+      <div className="pref-add">
+        <div className="cap">Add a preference</div>
+        <div className="row wrap" style={{ gap: 6 }}>
+          {options.map(c => <button type="button" key={catKey(c)} dir="auto" className={"chip sm" + (!custom && catKey(k) === catKey(c) ? " on" : "")} aria-pressed={!custom && catKey(k) === catKey(c)} onClick={() => pickCat(c)}>{c}</button>)}
+          <button type="button" className={"chip sm" + (custom ? " on" : "")} aria-pressed={custom} onClick={() => { setCustom(true); setK(""); }}><Icon n="plus" s={12} />New category</button>
+        </div>
+        {custom && <input className="input" autoFocus dir="auto" maxLength={200} aria-label="New category name" placeholder="Category name — e.g. Bank, Location, Ring size" value={k} onChange={e => setK(e.target.value)} onKeyDown={e => e.key === "Enter" && detail.current?.focus()} />}
+        <div className="row" style={{ gap: 8 }}>
+          <input ref={detail} className="input grow" dir="auto" aria-label="Detail" maxLength={5000} placeholder={k ? `${k} — size, brand, colour…` : "Pick a category first"} value={v} onChange={e => setV(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} />
+          <button type="button" className="btn primary" disabled={!k.trim() || busy} onClick={add}><Icon n="plus" s={14} />Add</button>
+        </div>
+        {k.trim() && !v.trim() && !groups.some(g => catKey(g.cat) === catKey(k)) && <span className="hint">No detail? The category is added empty — fill it later.</span>}
+      </div>
+    </>
   );
 }

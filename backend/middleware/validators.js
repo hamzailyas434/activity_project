@@ -249,7 +249,8 @@ exports.categoryRules = [
 
 exports.categoryUpdateRules = [
   param("id").isInt({ min: 1 }).withMessage("Invalid category ID"),
-  body("name").trim().notEmpty().withMessage("Category name required").isLength({ max: 100 }),
+  body("category").trim().notEmpty().withMessage("Category name required").isLength({ max: 200 }).withMessage("Category too long"),
+  body("notes").optional().isLength({ max: 5000 }).withMessage("Detail too long"),
 ];
 
 exports.recordIdRules = [

@@ -10,6 +10,7 @@ router.delete("/notes/:id",             v.recordIdRules, v.validate, c.deleteNot
 router.delete("/categories/:id",        v.categoryRules, v.validate, c.deleteCategory);
 router.put("/categories/:id",           v.categoryUpdateRules, v.validate, c.updateCategory);
 
+router.get("/pref-categories",               c.getPrefCategories);
 router.get("/",                              c.getProfiles);
 router.post("/",          v.createProfileRules, v.validate, c.createProfile);
 router.put("/:id",        v.updateProfileRules, v.validate, c.updateProfile);

@@ -26,3 +26,10 @@ export function usePeople(sub) {
 
   return { now, today, q, setQ, people, all, list, openId, editing };
 }
+
+/* Every preference category the user has used, for the category chips (presets + custom) */
+export function usePrefCats() {
+  const api = useApi();
+  const r = useLoad(api, a => a.get("/favourite-profiles/pref-categories"), "", []);
+  return { list: Array.isArray(r.data) ? r.data : [], reload: r.reload };
+}
