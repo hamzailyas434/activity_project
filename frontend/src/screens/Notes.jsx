@@ -1,18 +1,15 @@
 import { useEffect, useState } from "react";
 import { Drawer, Empty, Field, Head, Icon, Modal, RichEditor, RichView, Search, Seg, Skeleton, TONES, TONE_HEX, Toggle, useUI } from "../components/ui";
 import { useApi } from "../lib/api";
-import useLoad from "../lib/useLoad";
 import { fmtDate, plain } from "../lib/format";
 import { go } from "../shell/route";
+import { answersOf, useNote, useNotesList } from "../lib/notes";
 
 const CAT_T = c => TONES[[...String(c || "")].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 5];
-const LS_CATS = "noteCats";
-const readCats = () => { try { return JSON.parse(localStorage.getItem(LS_CATS) || "[]"); } catch { return []; } };
 const kb = n => (n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB");
 const ACCEPT = "image/jpeg,image/png,image/gif,image/webp,application/pdf";
 
 /* answers[] from the API, falling back to the legacy notes.answer column as Answer 01 */
-const answersOf = n => (n.answers?.length ? n.answers : n.answer ? [{ id: null, answer: n.answer, is_very_good: 0 }] : []);
 
 function Hl({ text, q }) {
   if (!q) return text;
@@ -20,46 +17,9 @@ function Hl({ text, q }) {
   return i < 0 ? text : <>{text.slice(0, i)}<mark className="hl">{text.slice(i, i + q.length)}</mark>{text.slice(i + q.length)}</>;
 }
 
-function useDebounced(v, ms = 280) {
-  const [d, setD] = useState(v);
-  useEffect(() => { const t = setTimeout(() => setD(v), ms); return () => clearTimeout(t); }, [v, ms]);
-  return d;
-}
 
 export default function Notes({ sub }) {
-  const api = useApi();
-  const { toast, ask } = useUI();
-  const [q, setQ] = useState(""), [cat, setCat] = useState("All"), [sort, setSort] = useState("new"), [lim, setLim] = useState(50), [catM, setCatM] = useState(false);
-  const dq = useDebounced(q.trim());
-  const notes = useLoad(api, a => {
-    const p = { limit: lim };
-    if (cat !== "All") p.category = cat;
-    if (dq) p.search = dq;
-    return a.get(`/notes?${new URLSearchParams(p)}`);
-  }, `${cat}|${dq}|${lim}`, []);
-  const cats = useLoad(api, a => a.get("/notes/categories"), "", []);
-  const [extra, setExtra] = useState(readCats);
-  const allCats = [...new Set([...(Array.isArray(cats.data) ? cats.data : []), ...extra].filter(Boolean))];
-
-  const list = (Array.isArray(notes.data) ? notes.data : []).slice().sort((a, b) =>
-    sort === "new" ? String(b.created_at).localeCompare(String(a.created_at))
-      : sort === "old" ? String(a.created_at).localeCompare(String(b.created_at))
-        : answersOf(b).length - answersOf(a).length);
-
-  // sub-routes: new · review · <id> · <id>/edit
-  const [sid, mode] = sub.split("/");
-  const openId = /^\d+$/.test(sid) ? +sid : null;
-  const editing = sid === "new" ? "new" : openId && mode === "edit" ? openId : null;
-  const reviewing = sid === "review";
-
-  const refresh = () => { notes.reload(); cats.reload(); };
-  const del = async n => {
-    if (!(await ask({ title: "Delete note?", body: `“${plain(n.question)}” and ${answersOf(n).length} answer(s).`, ok: "Delete", danger: true }))) return;
-    try { await api.del(`/notes/${n.id}`); notes.setData(l => l.filter(x => x.id !== n.id)); go("notes"); toast("Note deleted"); }
-    catch (e) { toast(e.message, "err"); }
-  };
-  const addCat = name => { const next = [...new Set([...extra, name])]; setExtra(next); try { localStorage.setItem(LS_CATS, JSON.stringify(next)); } catch { /* optional */ } };
-
+  const { toast, q, setQ, cat, setCat, sort, setSort, lim, setLim, catM, setCatM, notes, allCats, list, openId, editing, reviewing, refresh, del, addCat } = useNotesList(sub);
   return (
     <>
       <Head n="04" eyebrow={`${list.length}${list.length >= lim ? "+" : ""} notes · ${allCats.length} categories`} title={<>Things worth <em>remembering</em>.</>}
@@ -116,15 +76,8 @@ export default function Notes({ sub }) {
   );
 }
 
-/* Fetch a note (+ attachments) — uses the list copy while loading */
-function useNote(id, cached) {
-  const api = useApi();
-  const note = useLoad(api, a => (id ? a.get(`/notes/${id}`) : null), String(id), null);
-  const files = useLoad(api, a => (id ? a.get(`/notes/${id}/attachments`).catch(() => []) : []), String(id), []);
-  return { n: note.data || cached || null, loading: note.loading && !cached, error: note.error, files };
-}
 
-function NoteDrawer({ id, cached, onDelete }) {
+export function NoteDrawer({ id, cached, onDelete }) {
   const api = useApi();
   const { toast } = useUI();
   const { n, loading, error, files } = useNote(id, cached);
@@ -164,7 +117,7 @@ function NoteDrawer({ id, cached, onDelete }) {
 
 const readB64 = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error("Couldn't read " + f.name)); r.readAsDataURL(f); });
 
-function NoteEdit({ id, cached, cats, defaultCat, onClose, onSaved }) {
+export function NoteEdit({ id, cached, cats, defaultCat, onClose, onSaved }) {
   const api = useApi();
   const { toast, ask } = useUI();
   const loaded = useNote(id || 0, cached);
@@ -258,7 +211,7 @@ function NoteEdit({ id, cached, cats, defaultCat, onClose, onSaved }) {
   );
 }
 
-function CatAdd({ cats, onClose, onAdd }) {
+export function CatAdd({ cats, onClose, onAdd }) {
   const [v, setV] = useState("");
   const dup = cats.some(c => c.toLowerCase() === v.trim().toLowerCase());
   const ok = v.trim() && !dup;
@@ -272,7 +225,7 @@ function CatAdd({ cats, onClose, onAdd }) {
   );
 }
 
-function Review({ notes, onClose }) {
+export function Review({ notes, onClose }) {
   const [deck] = useState(() => [...notes].sort(() => Math.random() - 0.5));
   const [i, setI] = useState(0), [flip, setFlip] = useState(false), [k, setK] = useState(0);
   const n = deck[i], end = i >= deck.length;
