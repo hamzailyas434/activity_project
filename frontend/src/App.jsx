@@ -20,6 +20,7 @@ import Profile from "./screens/Profile";
 import Admin from "./screens/Admin";
 import Shell2 from "./v2/Shell";
 import Today2 from "./v2/Today";
+import Activities2 from "./v2/Activities";
 
 // react-pdf is heavy — load the Books screen on demand
 const Books = lazy(() => import("./screens/Books"));
@@ -67,7 +68,10 @@ function App() {
   };
 
   // v2 (Ink sidebar) screens; anything not ported yet falls back to its v3 screen inside the v2 shell
-  const screens2 = { dashboard: () => <Today2 cur={cur} name={name} /> };
+  const screens2 = {
+    dashboard: () => <Today2 cur={cur} name={name} />,
+    activities: () => <Activities2 cur={cur} sub={sub} />,
+  };
   const body = (sc) => (
     <>
       {!!user?.is_demo && (
