@@ -25,6 +25,7 @@ import Qaza2 from "./v2/Qaza";
 import Notes2 from "./v2/Notes";
 import Money2 from "./v2/Money";
 import People2 from "./v2/People";
+import Admin2 from "./v2/Admin";
 
 // react-pdf is heavy — load the Books screen on demand
 const Books = lazy(() => import("./screens/Books"));
@@ -80,6 +81,7 @@ function App() {
     notes: () => <Notes2 sub={sub} />,
     expenses: () => <Money2 sub={sub} />,
     favourites: () => <People2 sub={sub} />,
+    admin: () => <Admin2 />,
     books: () => <Suspense fallback={<Skeleton tiles={[["s12", 220], ["s12", 300]]} />}><Books2 sub={sub} /></Suspense>,
   };
   const body = (sc) => (
