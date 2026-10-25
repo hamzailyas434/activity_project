@@ -7,6 +7,8 @@
   This file maps its tokens into Tailwind 4 and adds the few app-only rules the prototype doesn't need.
 */
 @import "./styles/v3.css";
+/* v2 (Ink sidebar) design — only under html[data-design="v2"], switched in Profile → Appearance */
+@import "./v2/v2.css";
 
 @theme inline {
   --color-bg: var(--bg);

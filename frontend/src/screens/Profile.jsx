@@ -18,7 +18,7 @@ const EVENT = {
 };
 const Sect = ({ n, t, cls = "", children }) => <section className={"tile " + cls}><div className="th"><div><div className="cap">{n}</div><h3>{t}</h3></div></div>{children}</section>;
 
-export default function Profile({ theme, setTheme, onSignOut }) {
+export default function Profile({ theme, setTheme, design, setDesign, onSignOut }) {
   const api = useApi();
   const { user, updateUser } = useAuth();
   const { toast, ask } = useUI();
@@ -168,6 +168,11 @@ export default function Profile({ theme, setTheme, onSignOut }) {
         <div className="s4"><Sect n="05" t="Appearance">
           <Seg value={theme} onChange={setTheme} label="Theme" options={[["light", "Paper"], ["dark", "Ink"]]} />
           <p className="faint" style={{ fontSize: 12.5, marginTop: 12 }}>Same palette, two moods.</p>
+          {setDesign && <>
+            <div className="cap" style={{ margin: "18px 0 8px" }}>Design</div>
+            <Seg value={design} onChange={setDesign} label="Design" options={[["v3", "Orbit"], ["v2", "Classic"]]} />
+            <p className="faint" style={{ fontSize: 12.5, marginTop: 12 }}>Orbit: floating dock and bold tiles. Classic: sidebar and calm cards. Saved on this device.</p>
+          </>}
         </Sect></div>
 
         <div className="s4"><Sect n="06" t="Your data"><div className="stack">
