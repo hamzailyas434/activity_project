@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Avatar, Drawer, Empty, Field, Head, Icon, Modal, Search, Seg, Skeleton, TONES, TONE_HEX, useUI } from "../components/ui";
+import { useRef, useState } from "react";
+import { Avatar, Drawer, Empty, Field, Head, Icon, Modal, RichView, Search, Seg, Skeleton, TONES, TONE_HEX, useUI } from "../components/ui";
+import { mdTitle, mdToHtml } from "../lib/markdown";
 import { useApi } from "../lib/api";
 import useLoad from "../lib/useLoad";
 import { fmtDate, isoDate, toDate } from "../lib/format";
@@ -115,7 +116,7 @@ export function PersonSheet({ p, loading, today, onChanged }) {
     <Drawer kicker={p.relation || p.category || "Favourite"} title={p.name} onClose={close} lead={<Avatar name={p.name} c={TONES.indexOf(tone)} s={48} />}
       foot={<><button type="button" className="btn danger" style={{ marginRight: "auto" }} onClick={remove}>Remove</button>
         <button type="button" className="btn primary" onClick={() => go(`favourites/${id}/edit`)}><Icon n="edit" s={14} />Edit</button></>}>
-      <Seg value={tab} onChange={setTab} label="Section" options={[["prefs", "Preferences"], ["gifts", "Gifts"], ["info", "Details"]]} />
+      <Seg value={tab} onChange={setTab} label="Section" style={{ flexShrink: 0 }} options={[["prefs", "Preferences"], ["gifts", "Gifts"], ["notes", "Notes"], ["info", "Details"]]} />
 
       {tab === "prefs" && <>
         {prefs.loading && !pl.length ? <div className="skel" style={{ height: 120 }} /> : !grouped.length ? <Empty title="No preferences" body="Sizes, brands, wishes…" />
@@ -157,6 +158,8 @@ export function PersonSheet({ p, loading, today, onChanged }) {
           <button type="button" className="btn primary" disabled={!g.n.trim() || busy} onClick={logGift}>{g.d > today ? "Plan" : "Log"}</button>
         </div>
       </>}
+
+      {tab === "notes" && <PersonNotes id={id} name={p.name} />}
 
       {tab === "info" && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 10 }}>
@@ -263,5 +266,125 @@ export function PersonForm({ person, onClose, onSaved }) {
         </div>
       </div>
     </Modal>
+  );
+}
+
+/* Long notes for one person: paste or drop a markdown / text file, read it formatted. */
+const TEXT_FILE = /\.(md|markdown|txt)$/i;
+// the note's title is shown above the text, so don't repeat a first line that says the same
+const dropTitle = (body, title) => (mdTitle(body).toLowerCase() === title.trim().toLowerCase() ? String(body).replace(/^\s*[^\n]*\n?/, "") : body);
+
+function PersonNotes({ id, name }) {
+  const api = useApi();
+  const { toast, ask } = useUI();
+  const notes = useLoad(api, a => a.get(`/favourite-profiles/${id}/notes`), String(id), []);
+  const list = Array.isArray(notes.data) ? notes.data : [];
+  const [open, setOpen] = useState(null), [edit, setEdit] = useState(null); // edit: { id?, title, body }
+  const cur = list.find(n => n.id === open);
+
+  const remove = async n => {
+    if (!(await ask({ title: "Delete note?", body: n.title || "Untitled note", ok: "Delete", danger: true }))) return;
+    try { await api.del(`/favourite-profiles/notes/${n.id}`); notes.setData(l => l.filter(x => x.id !== n.id)); setOpen(null); toast("Note deleted"); }
+    catch (e) { toast(e.message, "err"); }
+  };
+
+  if (edit) return <PersonNoteEdit id={id} note={edit} onCancel={() => setEdit(null)}
+    onSaved={n => { notes.setData(l => [n, ...l.filter(x => x.id !== n.id)]); setEdit(null); setOpen(n.id); }} />;
+
+  if (cur) return (
+    <div className="stack" style={{ gap: 14, flexShrink: 0 }}>
+      <div className="row sb" style={{ gap: 8 }}>
+        <button type="button" className="btn sm ghost" onClick={() => setOpen(null)}><Icon n="chevL" s={14} />All notes</button>
+        <div className="row" style={{ gap: 6 }}>
+          <button type="button" className="btn sm" onClick={() => setEdit(cur)}><Icon n="edit" s={13} />Edit</button>
+          <button type="button" className="btn sm icon ghost danger" aria-label="Delete note" onClick={() => remove(cur)}><Icon n="trash" s={13} /></button>
+        </div>
+      </div>
+      <article className="tile sunk pn-read" style={{ padding: "18px 20px" }}>
+        {cur.title && <h3 className="serif ut" dir="auto" style={{ fontSize: 26, lineHeight: 1.1, marginBottom: 10 }}>{cur.title}</h3>}
+        <RichView html={mdToHtml(cur.title ? dropTitle(cur.body, cur.title) : cur.body)} />
+      </article>
+    </div>
+  );
+
+  return (
+    <>
+      {notes.loading && !list.length ? <div className="skel" style={{ height: 120 }} />
+        : !list.length ? <Empty title="No notes yet" body={`Guides, routines or anything long about ${name}. Paste text or drop a .md / .txt file.`} />
+        : list.map(n => {
+          const text = String(n.body || "").replace(/[#*_>`-]/g, "").replace(/\s+/g, " ").trim();
+          return (
+            <button type="button" key={n.id} className="tile sunk" onClick={() => setOpen(n.id)} style={{ flexShrink: 0, padding: 16, textAlign: "left", cursor: "pointer", display: "block", width: "100%" }}>
+              <b className="ut" dir="auto" style={{ fontSize: 15 }}>{n.title || "Untitled note"}</b>
+              <p className="muted ut" dir="auto" style={{ fontSize: 12.5, marginTop: 4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{text.slice(0, 220)}</p>
+              <span className="mono faint" style={{ fontSize: 10.5 }}>{n.updated_at ? fmtDate(n.updated_at) : ""}</span>
+            </button>
+          );
+        })}
+      <button type="button" className="btn primary" style={{ alignSelf: "flex-start" }} onClick={() => setEdit({ title: "", body: "" })}><Icon n="plus" s={14} />New note</button>
+    </>
+  );
+}
+
+function PersonNoteEdit({ id, note, onCancel, onSaved }) {
+  const api = useApi();
+  const { toast, ask } = useUI();
+  const [title, setTitle] = useState(note.title || ""), [body, setBody] = useState(note.body || "");
+  const [mode, setMode] = useState("write"), [over, setOver] = useState(false), [busy, setBusy] = useState(false);
+  const pick = useRef(null);
+  const dirty = title !== (note.title || "") || body !== (note.body || "");
+
+  const load = async file => {
+    if (!file) return;
+    if (!TEXT_FILE.test(file.name) && !/^text\//.test(file.type)) return toast("Only .md or .txt files", "err");
+    if (file.size > 100000) return toast("File is too big (max 100 KB)", "err");
+    const t = await file.text();
+    if (body.trim() && !(await ask({ title: "Replace the text?", body: `Use ${file.name} instead of what's written now.`, ok: "Replace" }))) return;
+    setBody(t);
+    if (!title.trim()) setTitle(mdTitle(t) || file.name.replace(TEXT_FILE, ""));
+    setMode("read");
+  };
+  const drop = e => {
+    setOver(false);
+    const f = e.dataTransfer?.files?.[0];
+    if (f) { e.preventDefault(); load(f); }
+  };
+  const save = async () => {
+    if (!body.trim() || busy) return;
+    setBusy(true);
+    try {
+      const data = { title: title.trim() || mdTitle(body), body };
+      const n = note.id ? await api.put(`/favourite-profiles/notes/${note.id}`, data) : await api.post(`/favourite-profiles/${id}/notes`, data);
+      toast("Note saved");
+      onSaved(n);
+    } catch (e) { toast(e.message, "err"); setBusy(false); }
+  };
+  const cancel = async () => { if (!dirty || await ask({ title: "Discard this note?", body: "What you typed will be lost.", ok: "Discard", danger: true })) onCancel(); };
+
+  return (
+    <div className="stack" style={{ gap: 12, flexShrink: 0 }}>
+      <Field label="Title"><input className="input" dir="auto" maxLength={200} value={title} onChange={e => setTitle(e.target.value)} placeholder={mdTitle(body) || "e.g. Makeup steps"} /></Field>
+      <div className="row sb" style={{ gap: 8 }}>
+        <Seg value={mode} onChange={setMode} label="Note view" options={[["write", "Write"], ["read", "Preview"]]} />
+        <button type="button" className="btn sm" onClick={() => pick.current?.click()}><Icon n="upload" s={13} />Open file</button>
+        <input ref={pick} type="file" hidden accept=".md,.markdown,.txt,text/plain,text/markdown" onChange={e => { load(e.target.files?.[0]); e.target.value = ""; }} />
+      </div>
+      {mode === "write" ? (
+        <div onDragOver={e => { if (e.dataTransfer?.types?.includes("Files")) { e.preventDefault(); setOver(true); } }} onDragLeave={() => setOver(false)} onDrop={drop}
+          style={{ borderRadius: "var(--r-m)", outline: over ? "2px dashed var(--accent)" : "none", outlineOffset: 2 }}>
+          <textarea className="input mono" dir="auto" aria-label="Note text" value={body} onChange={e => setBody(e.target.value)} rows={16}
+            placeholder={"Paste here, or drop a .md / .txt file.\n\n### Heading\n**Bold** · - list item · 1. numbered"} style={{ minHeight: 320, fontSize: 12.5, lineHeight: 1.55, resize: "vertical" }} />
+          <div className="hint" style={{ marginTop: 6 }}>Markdown works: ### heading, **bold**, *italic*, - lists, 1. numbered, &gt; quote.</div>
+        </div>
+      ) : (
+        <article className="tile sunk pn-read" style={{ padding: "18px 20px", minHeight: 200 }}>
+          {body.trim() ? <RichView html={mdToHtml(body)} /> : <span className="faint">Nothing to preview yet.</span>}
+        </article>
+      )}
+      <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
+        <button type="button" className="btn" onClick={cancel}>Cancel</button>
+        <button type="button" className="btn primary" disabled={!body.trim() || busy} onClick={save}><Icon n="check" s={14} />{busy ? "Saving…" : "Save note"}</button>
+      </div>
+    </div>
   );
 }

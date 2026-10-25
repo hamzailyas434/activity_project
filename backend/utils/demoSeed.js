@@ -140,7 +140,7 @@ function makePdf(pages) {
 // Every table a user's data lives in (children before parents)
 const USER_TABLES = ["book_favourite_pages", "book_highlights", "book_page_notes", "book_progress", "books", "reading_goals",
   "activity_completions", "month_routines", "day_journal", "activities", "note_answers", "note_attachments", "notes",
-  "sticky_notes", "monthly_todos", "expenses", "expense_budgets", "person_ledger", "favourite_profile_records",
+  "sticky_notes", "monthly_todos", "expenses", "expense_budgets", "person_ledger", "favourite_profile_notes", "favourite_profile_records",
   "favourite_profile_categories", "favourite_profiles", "user_settings", "refresh_tokens", "qaza_namaz"];
 
 async function wipeUserData(c, uid) {

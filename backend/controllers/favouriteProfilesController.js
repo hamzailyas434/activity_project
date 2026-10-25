@@ -292,3 +292,64 @@ exports.deleteRecord = async (req, res) => {
     res.status(500).json({ error: "Failed to delete record" });
   }
 };
+
+// ── Notes (long markdown text per person) ────────────────────────────────────
+
+exports.getNotes = async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT * FROM favourite_profile_notes WHERE profile_id = ? AND user_id = ? ORDER BY updated_at DESC, id DESC`,
+      [req.params.id, req.user.id]
+    );
+    res.json(rows);
+  } catch (error) {
+    if (error.code === "ER_NO_SUCH_TABLE") return res.json([]);
+    console.error("Error fetching person notes:", error);
+    res.status(500).json({ error: "Failed to fetch notes" });
+  }
+};
+
+exports.createNote = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const [own] = await db.query("SELECT id FROM favourite_profiles WHERE id = ? AND user_id = ?", [req.params.id, userId]);
+    if (!own.length) return res.status(404).json({ error: "Profile not found" });
+    const { title = "", body = "" } = req.body;
+    const [result] = await db.query(
+      "INSERT INTO favourite_profile_notes (profile_id, user_id, title, body) VALUES (?, ?, ?, ?)",
+      [req.params.id, userId, title.trim(), body]
+    );
+    const [rows] = await db.query("SELECT * FROM favourite_profile_notes WHERE id = ?", [result.insertId]);
+    res.status(201).json(rows[0]);
+  } catch (error) {
+    console.error("Error creating person note:", error);
+    res.status(500).json({ error: "Failed to save note" });
+  }
+};
+
+exports.updateNote = async (req, res) => {
+  try {
+    const { title = "", body = "" } = req.body;
+    const [result] = await db.query(
+      "UPDATE favourite_profile_notes SET title = ?, body = ? WHERE id = ? AND user_id = ?",
+      [title.trim(), body, req.params.id, req.user.id]
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ error: "Note not found" });
+    const [rows] = await db.query("SELECT * FROM favourite_profile_notes WHERE id = ?", [req.params.id]);
+    res.json(rows[0]);
+  } catch (error) {
+    console.error("Error updating person note:", error);
+    res.status(500).json({ error: "Failed to save note" });
+  }
+};
+
+exports.deleteNote = async (req, res) => {
+  try {
+    const [result] = await db.query("DELETE FROM favourite_profile_notes WHERE id = ? AND user_id = ?", [req.params.id, req.user.id]);
+    if (result.affectedRows === 0) return res.status(404).json({ error: "Note not found" });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting person note:", error);
+    res.status(500).json({ error: "Failed to delete note" });
+  }
+};

@@ -5,6 +5,8 @@ const v = require("../middleware/validators");
 
 // Sub-resource deletes must come before /:id to avoid param capture
 router.delete("/records/:id",           v.recordIdRules, v.validate, c.deleteRecord);
+router.put("/notes/:id",                v.personNoteRules, v.validate, c.updateNote);
+router.delete("/notes/:id",             v.recordIdRules, v.validate, c.deleteNote);
 router.delete("/categories/:id",        v.categoryRules, v.validate, c.deleteCategory);
 router.put("/categories/:id",           v.categoryUpdateRules, v.validate, c.updateCategory);
 
@@ -16,5 +18,7 @@ router.get("/:id/records",                   c.getRecords);
 router.post("/:id/records", v.upsertRecordRules, v.validate, c.upsertRecord);
 router.get("/:id/categories",                c.getCategories);
 router.post("/:id/categories",               c.createCategory);
+router.get("/:id/notes",                     c.getNotes);
+router.post("/:id/notes",   v.personNoteRules, v.validate, c.createNote);
 
 module.exports = router;

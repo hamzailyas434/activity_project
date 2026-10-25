@@ -263,6 +263,12 @@ exports.upsertRecordRules = [
   body("note").optional().isLength({ max: 2000 }).withMessage("Note too long"),
 ];
 
+exports.personNoteRules = [
+  param("id").isInt({ min: 1 }).withMessage("Invalid ID"),
+  body("title").optional().isString().isLength({ max: 200 }).withMessage("Title must be under 200 characters"),
+  body("body").isString().withMessage("Note text required").isLength({ min: 1, max: 100000 }).withMessage("Note must be 1–100,000 characters"),
+];
+
 // ── Notes — Answers ──────────────────────────────────────────────────────────
 exports.createAnswerRules = [
   body("answer").trim().notEmpty().withMessage("Answer required")
