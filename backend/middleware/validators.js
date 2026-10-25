@@ -181,6 +181,7 @@ exports.addHighlightRules = [
     .isLength({ max: 5000 }).withMessage("Selected text too long"),
   body("note").optional().isLength({ max: 2000 }).withMessage("Note too long"),
   body("color").optional().matches(/^#[0-9a-fA-F]{6}$/).withMessage("Invalid color hex"),
+  body("rect").optional({ nullable: true }).isLength({ max: 64 }).withMessage("Invalid highlight area"),
 ];
 
 exports.readingGoalRules = [

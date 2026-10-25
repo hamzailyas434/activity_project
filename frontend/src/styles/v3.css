@@ -344,3 +344,10 @@ em,i,.serif em,h1 em,h3 em{font-style:normal!important}
 .demo-bar b{font-weight:800}.demo-bar span{color:var(--fg-2);flex:1 1 220px}
 .demo-bar .btn{background:var(--fg);color:var(--bg)}
 a.brand{color:inherit;text-decoration:none;cursor:pointer;width:max-content}
+
+/* Reader highlights: text marks in the PDF text layer and boxes for scanned pages */
+.textLayer mark.rd-hl{background:rgba(233,180,76,.45);color:transparent;border-radius:2px;padding:0}
+.rd-areas{position:absolute;inset:0;pointer-events:none;z-index:3}
+.rd-areas.on{pointer-events:auto;cursor:crosshair;touch-action:none}
+.rd-areas i{position:absolute;background:rgba(233,180,76,.38);mix-blend-mode:multiply;border-radius:3px}
+.rd-areas i.drag{background:rgba(229,67,47,.18);outline:2px dashed var(--red);mix-blend-mode:normal}

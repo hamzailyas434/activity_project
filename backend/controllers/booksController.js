@@ -240,12 +240,15 @@ const addHighlight = async (req, res) => {
   try {
     const { page_number, selected_text, note, color } = req.body;
     if (!selected_text || !page_number) return res.status(400).json({ error: "page_number and selected_text required" });
+    // area highlight (scanned pages have no text): four fractions of the page, "x,y,w,h"
+    const rect = req.body.rect == null ? null : String(req.body.rect);
+    if (rect && !/^(0(\.\d+)?|1(\.0+)?)(,(0(\.\d+)?|1(\.0+)?)){3}$/.test(rect)) return res.status(400).json({ error: "Invalid highlight area" });
 
-    const [result] = await db.query(
-      "INSERT INTO book_highlights (user_id, book_id, page_number, selected_text, note, color) VALUES (?, ?, ?, ?, ?, ?)",
-      [req.user.id, req.params.id, page_number, selected_text, note || null, color || "#fef08a"]
-    );
-    res.status(201).json({ id: result.insertId, page_number, selected_text, note, color });
+    const args = [req.user.id, req.params.id, page_number, selected_text, note || null, color || "#fef08a"];
+    const [result] = rect
+      ? await db.query("INSERT INTO book_highlights (user_id, book_id, page_number, selected_text, note, color, rect) VALUES (?, ?, ?, ?, ?, ?, ?)", [...args, rect])
+      : await db.query("INSERT INTO book_highlights (user_id, book_id, page_number, selected_text, note, color) VALUES (?, ?, ?, ?, ?, ?)", args);
+    res.status(201).json({ id: result.insertId, page_number, selected_text, note, color, rect });
   } catch (err) {
     res.status(500).json({ error: "Failed to add highlight" });
   }

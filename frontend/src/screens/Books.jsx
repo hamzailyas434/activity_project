@@ -240,6 +240,9 @@ function Reader({ b, start, onClose, onProgress, onCover }) {
   const [file] = useState(() => ({ url: url(`/books/${b.id}/file`), httpHeaders: { Authorization: `Bearer ${token}` } }));
   const [coverDone, setCoverDone] = useState(!!b.cover_data);
   const isEpub = b.format === "epub", epubSel = useRef(""); // EPUB text lives in an iframe, so its selection is reported here
+  // Scanned PDFs have no selectable text: Highlight with nothing selected switches to dragging a box over the page
+  const [area, setArea] = useState(false), [drag, setDragS] = useState(null), dragR = useRef(null);
+  const setDrag = d => { dragR.current = typeof d === "function" ? d(dragR.current) : d; setDragS(dragR.current); }; // ref: pointer events can outrun renders
   const coverCanvas = useRef(null);
 
   const notes = useLoad(api, a => a.get(`/books/${b.id}/page-notes/${pg}`), `${b.id}-${pg}`, []);
@@ -273,11 +276,11 @@ function Reader({ b, start, onClose, onProgress, onCover }) {
       if (/INPUT|TEXTAREA|SELECT/.test(el?.tagName) || el?.isContentEditable || document.querySelector(".scrim")) return;
       if (e.key === "ArrowRight") goPage(pg + 1);
       if (e.key === "ArrowLeft") goPage(pg - 1);
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") { if (area) { setArea(false); setDrag(null); } else onClose(); }
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [pg, goPage, onClose]);
+  }, [pg, goPage, onClose, area]);
 
   const saveCover = async () => {
     const c = coverCanvas.current;
@@ -327,11 +330,37 @@ function Reader({ b, start, onClose, onProgress, onCover }) {
   };
   const highlight = async () => {
     const sel = String(window.getSelection() || "").trim() || epubSel.current;
-    if (!sel) return toast("Select text on the page first", "err");
+    if (!sel) {
+      if (isEpub) return toast("Select text on the page first", "err");
+      setArea(v => !v); setDrag(null);
+      if (!area) toast("Drag over the page to highlight an area · Esc to cancel");
+      return;
+    }
     try {
       const h = await api.post(`/books/${b.id}/highlights`, { page_number: pg, selected_text: sel.slice(0, 5000), note: null, color: TONE_HEX.gold });
       hls.setData(l => [...l, h]); window.getSelection()?.removeAllRanges(); epubSel.current = ""; toast("Highlighted"); setTab("hl"); setSide(true);
     } catch (e) { toast(e.message, "err"); }
+  };
+  const pt = e => { const r = e.currentTarget.getBoundingClientRect(); return [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))]; };
+  const boxOf = d => d && { x: Math.min(d.x0, d.x1), y: Math.min(d.y0, d.y1), w: Math.abs(d.x1 - d.x0), h: Math.abs(d.y1 - d.y0) };
+  const areaUp = async () => {
+    const r = boxOf(dragR.current);
+    setDrag(null);
+    if (!r || r.w < 0.02 || r.h < 0.01) return;
+    try {
+      const rect = [r.x, r.y, r.w, r.h].map(v => v.toFixed(4)).join(",");
+      const h = await api.post(`/books/${b.id}/highlights`, { page_number: pg, selected_text: `Area on p.${pg}`, note: null, color: TONE_HEX.gold, rect });
+      hls.setData(l => [...l, h]); setArea(false); toast("Highlighted"); setTab("hl"); setSide(true);
+    } catch (e) { toast(e.message, "err"); }
+  };
+  // text highlights painted into the PDF text layer (items that are part of a saved highlight)
+  const pageHl = hl.filter(h => h.page_number === pg);
+  const textHl = pageHl.filter(h => !h.rect).map(h => h.selected_text.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const esc = t => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const markText = ({ str }) => {
+    const t = str.replace(/\s+/g, " ").trim();
+    const hit = t.length > 1 && textHl.some(x => x.includes(t) || t.includes(x));
+    return hit ? `<mark class="rd-hl">${esc(str)}</mark>` : esc(str);
   };
   const delHl = async h => {
     if (!(await ask({ title: "Delete highlight?", body: `“${h.selected_text.slice(0, 140)}”`, ok: "Delete", danger: true }))) return;
@@ -354,23 +383,30 @@ function Reader({ b, start, onClose, onProgress, onCover }) {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "var(--bg-2)", display: "flex" }}>
       <div ref={pane} className="grow" style={{ overflow: "auto", padding: "calc(78px + env(safe-area-inset-top)) 16px calc(110px + env(safe-area-inset-bottom))", marginRight: panelW }}>
-        <div style={{ width: isEpub ? Math.max(240, Math.min(820, paneW - 32)) : pageW, margin: "0 auto", borderRadius: 14, overflow: "hidden", boxShadow: "0 40px 80px -40px rgba(0,0,0,.5)", background: "#FBF8F1" }}>
+        <div style={{ position: "relative", width: isEpub ? Math.max(240, Math.min(820, paneW - 32)) : pageW, margin: "0 auto", borderRadius: 14, overflow: "hidden", boxShadow: "0 40px 80px -40px rgba(0,0,0,.5)", background: "#FBF8F1" }}>
           {isEpub ? (
             <EpubView id={b.id} token={token} pg={pg} width={Math.max(240, Math.min(820, paneW - 32))} zoom={zoom} coverDone={coverDone}
               onPages={n => { setPages(n); if (b.total_pages !== n) api.put(`/books/${b.id}/progress`, { current_page: pg, total_pages: n }).catch(() => {}); }}
               onMoved={goPage} onSelect={t => { epubSel.current = t; }}
               onCover={data => { setCoverDone(true); api.put(`/books/${b.id}/cover`, { cover_data: data }).then(() => onCover(b.id, data)).catch(() => {}); }}
               onError={() => toast("Couldn't open this EPUB", "err")} />
-          ) : (
+          ) : (<>
             <Document file={file} onLoadSuccess={({ numPages }) => { setPages(numPages); if (!b.total_pages) api.put(`/books/${b.id}/progress`, { current_page: pg, total_pages: numPages }).catch(() => {}); }}
               onLoadError={() => toast("Couldn't load this PDF", "err")}
               loading={<div className="skel" style={{ height: pageW * 1.35, borderRadius: 0 }} />}
               error={<div style={{ padding: 40 }}><Empty title="Couldn't open PDF" body="The file may be missing on the server." /></div>}>
-              <Page pageNumber={pg} width={pageW} renderTextLayer renderAnnotationLayer loading={<div className="skel" style={{ height: pageW * 1.35, borderRadius: 0 }} />} />
+              <Page pageNumber={pg} width={pageW} renderTextLayer renderAnnotationLayer customTextRenderer={textHl.length ? markText : undefined} loading={<div className="skel" style={{ height: pageW * 1.35, borderRadius: 0 }} />} />
               {!coverDone && <div style={{ position: "absolute", opacity: 0, pointerEvents: "none", left: -9999 }} aria-hidden="true">
                 <Page pageNumber={1} width={300} renderTextLayer={false} renderAnnotationLayer={false} canvasRef={coverCanvas} onRenderSuccess={saveCover} /></div>}
             </Document>
-          )}
+            <div aria-hidden={!area} className={"rd-areas" + (area ? " on" : "")}
+              onPointerDown={area ? e => { try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* synthetic or finished pointer */ } const [x, y] = pt(e); setDrag({ x0: x, y0: y, x1: x, y1: y }); } : undefined}
+              onPointerMove={area ? e => { if (!dragR.current) return; const [x, y] = pt(e); setDrag(d => ({ ...d, x1: x, y1: y })); } : undefined}
+              onPointerUp={area ? areaUp : undefined}>
+              {pageHl.filter(h => h.rect).map(h => { const [x, y, w, hh] = h.rect.split(",").map(Number); return <i key={h.id} title={h.note || "Highlight"} style={{ left: x * 100 + "%", top: y * 100 + "%", width: w * 100 + "%", height: hh * 100 + "%" }} />; })}
+              {drag && (() => { const r = boxOf(drag); return <i className="drag" style={{ left: r.x * 100 + "%", top: r.y * 100 + "%", width: r.w * 100 + "%", height: r.h * 100 + "%" }} />; })()}
+            </div>
+          </>)}
         </div>
       </div>
 
@@ -381,7 +417,7 @@ function Reader({ b, start, onClose, onProgress, onCover }) {
           <span className="mono" style={{ fontSize: 11, width: 38, textAlign: "center" }}>{zoom}%</span>
           <button type="button" className="btn ghost sm icon" aria-label="Zoom in" disabled={zoom >= 200} onClick={() => setZoom(z => Math.min(200, z + 10))}><Icon n="zoomIn" s={15} /></button>
           <button type="button" className="btn ghost sm icon" aria-label="Bookmark page" aria-pressed={marked} onClick={() => mark()} style={{ color: marked ? "var(--red)" : undefined }}><Icon n="bookmark" s={15} fill={marked ? "currentColor" : undefined} /></button>
-          <button type="button" className="btn ghost sm" onMouseDown={e => e.preventDefault()} onClick={highlight}><Icon n="pen" s={14} />Highlight</button>
+          <button type="button" className={"btn sm " + (area ? "red" : "ghost")} aria-pressed={area} onMouseDown={e => e.preventDefault()} onClick={highlight}><Icon n="pen" s={14} />{area ? "Drag on page" : "Highlight"}</button>
           <button type="button" className="btn ghost sm icon" aria-label={side ? "Hide notes panel" : "Show notes panel"} aria-pressed={side} onClick={() => setSide(v => !v)}><Icon n="panel" s={15} /></button>
         </div>
       </div>
@@ -428,10 +464,10 @@ function Reader({ b, start, onClose, onProgress, onCover }) {
               <div key={h.id} className="tile sunk" style={{ padding: 12, borderLeft: `4px solid ${h.color || "var(--gold)"}` }}>
                 <div className="row sb"><button type="button" className="mono faint" onClick={() => goPage(h.page_number)} style={{ fontSize: 10.5, border: "none", background: "none", cursor: "pointer", padding: 0 }}>p.{h.page_number} →</button>
                   <button type="button" className="btn ghost sm icon" aria-label="Delete highlight" onClick={() => delHl(h)}><Icon n="trash" s={13} /></button></div>
-                <p className="ut" dir="auto" style={{ fontSize: fs - 1 }}>“{h.selected_text}”</p>
+                <p className="ut" dir="auto" style={{ fontSize: fs - 1 }}>{h.rect ? <span className="faint">▢ Highlighted area</span> : `“${h.selected_text}”`}</p>
                 {h.note && <p className="faint ut" dir="auto" style={{ fontSize: 12, marginTop: 4 }}>{h.note}</p>}
               </div>
-            )) : <p className="faint" style={{ fontSize: 13 }}>Select text on the page, then tap Highlight.</p>)}
+            )) : <p className="faint" style={{ fontSize: 13 }}>Select text on the page, then tap Highlight. On scanned pages, tap Highlight and drag a box.</p>)}
           </div>
           {tab === "notes" && (
             <div className="bn-compose">
