@@ -54,7 +54,7 @@ export default function Today({ cur, name }) {
   }, `${y}-${m}`, null);
   const notes = useLoad(api, a => a.get("/notes?limit=60"), "", []);
 
-  const [sticky, setSticky] = useState(null), [rv, setRv] = useState(0), [reveal, setReveal] = useState(false);
+  const [sticky, setSticky] = useState(null), [rv, setRv] = useState(0), [reveal, setReveal] = useState(false), [allSt, setAllSt] = useState(false);
 
   const acts = cur.activities, comp = cur.comp;
   const isDone = a => !!comp[`${d}-${a.id}`]?.done;
@@ -191,12 +191,16 @@ export default function Today({ cur, name }) {
           </section>
 
           <section className="tile s6">
-            <div className="th"><div><div className="cap">Pinned</div><h3>Sticky <em>board</em></h3></div><button type="button" className="btn sm" onClick={() => setSticky({ text: "", tone: STICKY_T[stickyList.length % 5] })}><Icon n="plus" s={14} />Sticky</button></div>
+            <div className="th"><div><div className="cap">Pinned</div><h3>Sticky <em>board</em></h3></div><div className="row" style={{ gap: 6 }}>
+              {stickyList.length > 3 && <button type="button" className="btn sm ghost" aria-expanded={allSt} onClick={() => setAllSt(v => !v)}>{allSt ? "Show less" : `All ${stickyList.length}`}</button>}
+              <button type="button" className="btn sm" onClick={() => setSticky({ text: "", tone: STICKY_T[stickyList.length % 5] })}><Icon n="plus" s={14} />Sticky</button></div></div>
             {stickies.loading && !stickyList.length ? <div className="skel" style={{ height: 150 }} /> : !stickyList.length ? <Empty title="Board is clear" body="Pin a thought with Quick add." /> : (
-              <div style={{ display: "flex", gap: 12, overflowX: "auto", padding: "6px 2px 10px", scrollSnapType: "x mandatory" }}>{stickyList.map((n, i) =>
+              // three per row; the rest open with "All N"
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 12, padding: "6px 2px 10px" }}>{(allSt ? stickyList : stickyList.slice(0, 3)).map((n, i) =>
                 <button type="button" key={n.id} dir="auto" className="tile ut" onClick={() => setSticky({ ...n, tone: stickyTone(n.color, i) })}
                   // filled with its colour: the ink pass turns t-gold/green/blue/violet tiles white with a thin top bar
-                  style={{ background: TONE_HEX[stickyTone(n.color, i)], color: stickyTone(n.color, i) === "red" ? "#fff" : "#111", flex: "0 0 180px", minHeight: 150, textAlign: "left", cursor: "pointer", scrollSnapAlign: "start", transform: `rotate(${(i % 3 - 1) * 1.6}deg)`, fontWeight: 700, fontSize: 14, lineHeight: 1.4, whiteSpace: "pre-wrap", alignItems: "flex-start", display: "block" }}>{n.text}</button>)}</div>
+                  style={{ background: TONE_HEX[stickyTone(n.color, i)], color: stickyTone(n.color, i) === "red" ? "#fff" : "#111", height: 160, padding: "16px 14px", overflow: "hidden", textAlign: "left", cursor: "pointer", transform: `rotate(${(i % 3 - 1) * 1.6}deg)`, fontWeight: 700, fontSize: "clamp(12px,1.1vw,14px)", lineHeight: 1.4, whiteSpace: "pre-wrap", overflowWrap: "break-word", hyphens: "auto", alignItems: "flex-start", display: "block" }}>
+                  <span style={{ display: "-webkit-box", WebkitLineClamp: 5, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{n.text}</span></button>)}</div>
             )}
           </section>
 
