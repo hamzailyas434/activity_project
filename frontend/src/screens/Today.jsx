@@ -60,6 +60,9 @@ export default function Today({ cur, name }) {
   const isDone = a => !!comp[`${d}-${a.id}`]?.done;
   const done = acts.filter(isDone).length, pct = dayPct(acts, comp, d);
   const next = acts.find(a => !isDone(a));
+  // a bar in the Today card can be hovered (preview) or clicked (pin) to work on that routine instead of "Next up"
+  const [pickId, setPickId] = useState(null), [hoverId, setHoverId] = useState(null);
+  const focus = acts.find(a => a.id === hoverId) || acts.find(a => a.id === pickId) || next;
 
   // day % for any date within this or last month (null if out of range / future)
   const pctOn = date => {
@@ -118,17 +121,33 @@ export default function Today({ cur, name }) {
           <section className="tile t-red s4" style={{ display: "flex", flexDirection: "column", gap: 18, minHeight: 360 }}>
             <div className="row sb"><span className="cap">Today</span><span className="mono" style={{ fontSize: 12 }}>{done}/{acts.length}</span></div>
             <div className="big" style={{ fontSize: "clamp(96px,10vw,150px)" }}>{Math.round(pct * 100)}<small>%</small></div>
-            <div style={{ display: "flex", gap: 4 }}>{acts.map(a => <i key={a.id} title={a.name} style={{ flex: 1, height: 8, borderRadius: 99, background: isDone(a) ? "#fff" : "rgba(255,255,255,.28)" }} />)}</div>
+            <div style={{ display: "flex", gap: 4 }} onMouseLeave={() => setHoverId(null)}>{acts.map(a => {
+              const on = isDone(a), sel = focus?.id === a.id;
+              return (
+                <button type="button" key={a.id} title={a.name} aria-label={`${a.name}, ${on ? "done" : "not done"}`} aria-pressed={pickId === a.id}
+                  onMouseEnter={() => setHoverId(a.id)} onFocus={() => setHoverId(a.id)} onBlur={() => setHoverId(null)}
+                  onClick={() => { setPickId(id => (id === a.id ? null : a.id)); setHoverId(null); }}
+                  style={{ flex: 1, minWidth: 0, height: 22, padding: 0, border: "none", background: "none", cursor: "pointer", display: "grid", alignItems: "center" }}>
+                  <i style={{ display: "block", height: sel ? 12 : 8, borderRadius: 99, background: on ? "#fff" : "rgba(255,255,255,.28)", boxShadow: sel ? "0 0 0 2px rgba(0,0,0,.35)" : "none", transition: "height var(--fast)" }} />
+                </button>
+              );
+            })}</div>
             <div style={{ marginTop: "auto" }}>
-              <div className="cap" style={{ marginBottom: 8 }}>{!acts.length ? "No routines yet" : next ? "Next up" : "All done"}</div>
-              {next ? (
+              <div className="row sb" style={{ marginBottom: 8 }}>
+                <span className="cap">{!acts.length ? "No routines yet" : !focus ? "All done" : focus === next && !pickId && !hoverId ? "Next up" : isDone(focus) ? "Done ✓" : "Selected"}{focus?.group ? ` · ${focus.group}` : ""}</span>
+                {pickId && <button type="button" className="cap" onClick={() => setPickId(null)} style={{ border: "none", background: "none", color: "inherit", cursor: "pointer", padding: 0 }}>Back to next up</button>}
+              </div>
+              {focus ? (
                 <div className="row" style={{ background: "rgba(0,0,0,.16)", borderRadius: 20, padding: "10px 10px 10px 18px" }}>
-                  <span className="serif grow ut" dir="auto" style={{ fontSize: 30, lineHeight: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{next.name}</span>
-                  {next.type === "number" || next.type === "text"
-                    ? <input key={next.id} className="input" type={next.type === "number" ? "number" : "text"} dir="auto" placeholder={next.type === "number" ? "0" : "…"} aria-label={next.name}
+                  <span className="serif grow ut" dir="auto" style={{ fontSize: 30, lineHeight: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: isDone(focus) ? 0.75 : 1 }}>{focus.name}</span>
+                  {focus.type === "number" || focus.type === "text"
+                    ? <input key={focus.id} className="input" type={focus.type === "number" ? "number" : "text"} dir="auto" placeholder={focus.type === "number" ? "0" : "…"} aria-label={focus.name}
+                        defaultValue={comp[`${d}-${focus.id}`]?.value ?? ""}
                         style={{ width: 96, height: 42, background: "#fff", color: "#111" }}
-                        onKeyDown={e => { if (e.key === "Enter" && e.currentTarget.value.trim()) { setNum(next, e.currentTarget.value); toast(next.name + " logged"); } }} />
-                    : <button type="button" className="btn" style={{ background: "#fff", color: "#111" }} onClick={() => { toggle(next); toast(next.name + " ✓"); }}><Icon n="check" s={15} w={2.5} />Done</button>}
+                        onKeyDown={e => { if (e.key === "Enter") { setNum(focus, e.currentTarget.value.trim()); toast(focus.name + (e.currentTarget.value.trim() ? " logged" : " cleared")); } }} />
+                    : isDone(focus)
+                      ? <button type="button" className="btn" style={{ background: "rgba(255,255,255,.22)", color: "#fff" }} onClick={() => { toggle(focus); toast(focus.name + " undone"); }}>Undo</button>
+                      : <button type="button" className="btn" style={{ background: "#fff", color: "#111" }} onClick={() => { toggle(focus); toast(focus.name + " ✓"); }}><Icon n="check" s={15} w={2.5} />Done</button>}
                 </div>
               ) : acts.length ? <div className="serif" style={{ fontSize: 34 }}>Day complete</div>
                 : <button type="button" className="btn" style={{ background: "#fff", color: "#111" }} onClick={() => go("activities/new")}><Icon n="plus" />Add routine</button>}
