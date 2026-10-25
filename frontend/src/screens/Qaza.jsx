@@ -1,69 +1,20 @@
 import { useEffect, useState } from "react";
-import { Empty, Field, Head, Icon, Meter, Skeleton, useUI } from "../components/ui";
-import { useApi } from "../lib/api";
-import useLoad from "../lib/useLoad";
-import useNow from "../lib/useNow";
+import { Empty, Field, Head, Icon, Meter, Skeleton } from "../components/ui";
+import { P, owedOf, remOf, useQaza } from "../lib/qaza";
 import { ago } from "../lib/format";
 
-const P = ["Fajr", "Zuhr", "Asr", "Maghrib", "Isha"];
-
-/* API shape → editable state. owed = years × 365, remaining = owed + adjustment (made up = owed − remaining). */
-const fromApi = d => ({
-  years: Object.fromEntries(P.map(n => [n, parseFloat(d?.[n]) || 0])),
-  adj: Object.fromEntries(P.map(n => [n, Number(d?.adjustments?.[n] || 0)])),
-  at: Object.fromEntries(P.map(n => [n, d?.namaz_updated_at?.[n] || d?.updated_at || null])),
-});
-const owedOf = (q, n) => Math.floor(q.years[n] * 365);
-const remOf = (q, n) => Math.max(0, owedOf(q, n) + q.adj[n]);
-
 export default function Qaza() {
-  const api = useApi();
-  const { toast } = useUI();
-  const now = useNow();
-  const { data, setData, loading, error, reload } = useLoad(api, async a => fromApi(await a.get("/qaza-namaz")), "", null);
-  const [q, setQ] = useState(null), [base, setBase] = useState(null), [pace, setPace] = useState(1), [busy, setBusy] = useState(false);
-  if (data && data !== base) { setBase(data); setQ(data); }
+  const { now, data, loading, error, reload, q, pace, setPace, busy, dirty, tot, made, maxRem, days, fin, years, adj, logAll, setYears, discard, save } = useQaza();
 
   // q stays null for the render that first sets it from data, so keep showing the skeleton until it lands
   if (!q && (loading || data)) return <><Head n="03" eyebrow="Qaza Namaz" title={<>Loading <em>qaza</em>.</>} /><Skeleton tiles={[["s7", 280], ["s5", 280], ["s12", 260]]} /></>;
   if (!q) return <Empty title="Couldn't load" body={error} action={<button type="button" className="btn primary" onClick={reload}>Try again</button>} />;
 
-  const dirty = JSON.stringify({ y: q.years, a: q.adj }) !== JSON.stringify({ y: base.years, a: base.adj });
-  const tot = P.reduce((t, n) => ({ o: t.o + owedOf(q, n), r: t.r + remOf(q, n) }), { o: 0, r: 0 });
-  const made = Math.max(0, tot.o - tot.r);
-  const maxRem = Math.max(0, ...P.map(n => remOf(q, n)));
-  const days = Math.ceil(maxRem / pace);
-  const fin = new Date(now); fin.setDate(fin.getDate() + days);
-  const ys = [...new Set(P.map(n => q.years[n]))];
-  const years = ys.length === 1 ? ys[0] : null;
-
-  const adj = (n, delta) => setQ(x => {
-    const owed = owedOf(x, n), rem = remOf(x, n);
-    const next = Math.max(0, Math.min(owed, rem - delta)); // +delta made up → remaining goes down
-    return { ...x, adj: { ...x.adj, [n]: next - owed }, at: { ...x.at, [n]: new Date().toISOString() } };
-  });
-  const logAll = () => { P.forEach(n => adj(n, pace)); toast(`+${pace} logged for each — save to keep`); };
-  const setYears = v => {
-    const y = Math.max(0, Math.min(9999, parseFloat(v) || 0));
-    setQ(x => ({ ...x, years: Object.fromEntries(P.map(n => [n, y])) })); // made-up counts (adjustments) are kept
-  };
-  const save = async () => {
-    setBusy(true);
-    try {
-      const body = { ...Object.fromEntries(P.map(n => [n, q.years[n] ? String(q.years[n]) : ""])), adjustments: q.adj };
-      await api.post("/qaza-namaz", body);
-      const fresh = fromApi(await api.get("/qaza-namaz"));
-      setData(fresh);
-      toast("Qaza saved");
-    } catch (e) { toast(e.message, "err"); }
-    finally { setBusy(false); }
-  };
-
   return (
     <>
       <Head n="03" eyebrow={`Qaza Namaz · ${years != null ? years + " years" : "per prayer"}`} title={<><em>{tot.r.toLocaleString()}</em> left to make up.</>}
         sub={tot.o ? `${made.toLocaleString()} made up so far. Steady beats sudden — pick a pace you can keep.` : "Set how many years were missed to start counting."}>
-        <button type="button" className="btn" disabled={!dirty || busy} onClick={() => setQ(base)}>Discard</button>
+        <button type="button" className="btn" disabled={!dirty || busy} onClick={discard}>Discard</button>
         <button type="button" className="btn primary" disabled={!dirty || busy} onClick={save}><Icon n="check" />{busy ? "Saving…" : "Save"}</button>
       </Head>
 

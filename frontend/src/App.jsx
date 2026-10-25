@@ -21,6 +21,7 @@ import Admin from "./screens/Admin";
 import Shell2 from "./v2/Shell";
 import Today2 from "./v2/Today";
 import Activities2 from "./v2/Activities";
+import Qaza2 from "./v2/Qaza";
 
 // react-pdf is heavy — load the Books screen on demand
 const Books = lazy(() => import("./screens/Books"));
@@ -71,6 +72,7 @@ function App() {
   const screens2 = {
     dashboard: () => <Today2 cur={cur} name={name} />,
     activities: () => <Activities2 cur={cur} sub={sub} />,
+    "qaza-namaz": () => <Qaza2 />,
   };
   const body = (sc) => (
     <>
