@@ -24,6 +24,7 @@ import Activities2 from "./v2/Activities";
 import Qaza2 from "./v2/Qaza";
 import Notes2 from "./v2/Notes";
 import Money2 from "./v2/Money";
+import People2 from "./v2/People";
 
 // react-pdf is heavy — load the Books screen on demand
 const Books = lazy(() => import("./screens/Books"));
@@ -77,6 +78,7 @@ function App() {
     "qaza-namaz": () => <Qaza2 />,
     notes: () => <Notes2 sub={sub} />,
     expenses: () => <Money2 sub={sub} />,
+    favourites: () => <People2 sub={sub} />,
   };
   const body = (sc) => (
     <>

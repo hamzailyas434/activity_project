@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Avatar, Drawer, Empty, Field, Head, Icon, Modal, Search, Seg, Skeleton, TONES, TONE_HEX, useUI } from "../components/ui";
 import { useApi } from "../lib/api";
 import useLoad from "../lib/useLoad";
-import useNow from "../lib/useNow";
 import { fmtDate, isoDate, toDate } from "../lib/format";
 import { useCurrency } from "../hooks/useCurrency";
 import { go } from "../shell/route";
+import { usePeople } from "../lib/people";
 
 const RELS = ["Spouse", "Parent", "Sibling", "Child", "Friend", "Colleague", "Other"];
 const PREF_K = ["Shoes", "Perfume", "Books", "Jewellery", "Clothes", "Gadgets"];
@@ -17,24 +17,7 @@ const dstr = v => { const d = toDate(v); return d ? isoDate(d) : ""; };
 const isPlanned = (g, today) => { const d = dstr(g.gift_date); return (d && d > today) || (!Number(g.amount) && /dena hai/i.test(`${g.gift_item} ${g.note || ""}`)); };
 
 export default function People({ sub }) {
-  const api = useApi();
-  const now = useNow();
-  const today = isoDate(now);
-  const [q, setQ] = useState("");
-  const people = useLoad(api, async a => {
-    const list = await a.get("/favourite-profiles");
-    const ps = Array.isArray(list) ? list : [];
-    // gifts per person, for the upcoming-gift pill on each card
-    const recs = await Promise.all(ps.map(p => a.get(`/favourite-profiles/${p.id}/records`).catch(() => [])));
-    return ps.map((p, i) => ({ ...p, gifts: Array.isArray(recs[i]) ? recs[i] : [] }));
-  }, "", []);
-  const all = Array.isArray(people.data) ? people.data : [];
-  const list = all.filter(p => !q || `${p.name} ${p.relation || p.category || ""}`.toLowerCase().includes(q.toLowerCase()));
-
-  const [sid, mode] = sub.split("/");
-  const openId = /^\d+$/.test(sid) ? +sid : null;
-  const editing = sid === "new" ? "new" : openId && mode === "edit" ? openId : null;
-
+  const { today, q, setQ, people, all, list, openId, editing } = usePeople(sub);
   return (
     <>
       <Head n="06" eyebrow={`${all.length} ${all.length === 1 ? "person" : "people"}`} title={<>The people who <em>matter</em>.</>} sub="Sizes, wishes and the gifts you gave — so you never have to guess.">
@@ -81,7 +64,7 @@ export default function People({ sub }) {
   );
 }
 
-function PersonSheet({ p, loading, today, onChanged }) {
+export function PersonSheet({ p, loading, today, onChanged }) {
   const api = useApi();
   const { toast, ask } = useUI();
   const { format: money } = useCurrency();
@@ -188,7 +171,7 @@ function PersonSheet({ p, loading, today, onChanged }) {
   );
 }
 
-function PersonForm({ person, onClose, onSaved }) {
+export function PersonForm({ person, onClose, onSaved }) {
   const api = useApi();
   const { toast, ask } = useUI();
   const editing = !!person;
