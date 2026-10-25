@@ -10,6 +10,7 @@ import useLoad from "../lib/useLoad";
 import { ago, plain } from "../lib/format";
 import { go } from "../shell/route";
 import EpubView from "./EpubView";
+import { useShelf } from "../lib/books";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -19,26 +20,7 @@ const ls = (k, d) => { try { const v = +localStorage.getItem(k); return v || d; 
 const lsSet = (k, v) => { try { localStorage.setItem(k, String(v)); } catch { /* optional */ } };
 
 export default function Books({ sub }) {
-  const api = useApi();
-  const { toast, ask } = useUI();
-  const books = useLoad(api, a => a.get("/books"), "", []);
-  const summary = useLoad(api, a => a.get("/books/dashboard-summary"), "", null);
-  const [up, setUp] = useState(false), [goal, setGoal] = useState(false);
-  const list = Array.isArray(books.data) ? books.data : [];
-  const today = summary.data?.pages_today || 0, target = summary.data?.daily_pages_goal || 10;
-  // most recently read first; fall back to newest upload
-  const cur = [...list].sort((a, b) => String(b.last_read_date || "").localeCompare(String(a.last_read_date || "")))[0];
-  // #/books/4 opens the reader at the saved page, #/books/4/161 at page 161
-  const [, idS, pgS] = String(sub || "").match(/^(\d+)(?:\/(\d+))?$/) || [];
-  const openId = idS ? +idS : null, openPg = pgS ? +pgS : null;
-  const reading = openId && list.find(b => b.id === openId);
-
-  const del = async b => {
-    if (!(await ask({ title: `Delete ${b.title}?`, body: "The book file, its notes, bookmarks and highlights will be removed.", ok: "Delete", danger: true }))) return;
-    try { await api.del(`/books/${b.id}`); books.setData(l => l.filter(x => x.id !== b.id)); toast("Book deleted"); }
-    catch (e) { toast(e.message, "err"); }
-  };
-
+  const { api, books, summary, up, setUp, goal, setGoal, list, today, target, cur, openId, openPg, reading, del } = useShelf(sub);
   if (openId && books.loading && !list.length) return <div className="boot" aria-busy="true"><i /></div>;
   if (reading) return <Reader key={`${reading.id}-${openPg || ""}`} b={reading} start={openPg} onClose={() => go("books")} onProgress={(id, page, total) => { books.setData(l => l.map(x => (x.id === id ? { ...x, current_page: page, total_pages: total || x.total_pages, last_read_date: new Date().toISOString() } : x))); summary.reload(); }}
     onCover={(id, cover) => books.setData(l => l.map(x => (x.id === id ? { ...x, cover_data: cover } : x)))} />;
@@ -104,7 +86,7 @@ export default function Books({ sub }) {
 }
 
 /* All page notes outside the reader: Favourites or one book. A card opens the reader at its page. */
-function BookNotes({ api, books }) {
+export function BookNotes({ api, books }) {
   const { toast } = useUI();
   const sum = useLoad(api, a => a.get("/books/notes-summary"), "", null);
   const favs = useLoad(api, a => a.get("/books/favourite-notes"), "", []);
@@ -159,7 +141,7 @@ function BookNotes({ api, books }) {
   );
 }
 
-function Spine({ b, h }) {
+export function Spine({ b, h }) {
   const tone = toneOf(b);
   return (
     <div style={{ width: 70, height: h, borderRadius: 10, background: TONE_HEX[tone], color: tone === "red" ? "#fff" : "#111", display: "flex", flexDirection: "column", justifyContent: "space-between", alignItems: "center", padding: "14px 0", flexShrink: 0, position: "relative", overflow: "hidden", boxShadow: "inset -6px 0 0 rgba(0,0,0,.12), 0 12px 24px -14px rgba(0,0,0,.5)" }}>
@@ -171,7 +153,7 @@ function Spine({ b, h }) {
   );
 }
 
-function Upload({ onClose, onDone }) {
+export function Upload({ onClose, onDone }) {
   const api = useApi();
   const { toast } = useUI();
   const [f, setF] = useState(null), [title, setTitle] = useState(""), [author, setAuthor] = useState(""), [busy, setBusy] = useState(false), [over, setOver] = useState(false), [t, setT] = useState(false);
@@ -204,7 +186,7 @@ function Upload({ onClose, onDone }) {
   );
 }
 
-function Goal({ value, onClose, onSaved }) {
+export function Goal({ value, onClose, onSaved }) {
   const api = useApi();
   const { toast } = useUI();
   const [v, setV] = useState(String(value));
@@ -228,7 +210,7 @@ function Goal({ value, onClose, onSaved }) {
 
 /* Full-screen reader: real PDF via react-pdf, floating Shelf button, zoom / bookmark / highlight / notes pill,
    bottom page-nav pill, resizable side panel with Notes · Bookmarks · Highlights. */
-function Reader({ b, start, onClose, onProgress, onCover }) {
+export function Reader({ b, start, onClose, onProgress, onCover }) {
   const api = useApi();
   const { token } = useAuth();
   const { toast, ask } = useUI();

@@ -28,6 +28,7 @@ import People2 from "./v2/People";
 
 // react-pdf is heavy — load the Books screen on demand
 const Books = lazy(() => import("./screens/Books"));
+const Books2 = lazy(() => import("./v2/Books"));
 
 const AUTH_ROUTES = ["welcome", "login", "register"];
 
@@ -79,6 +80,7 @@ function App() {
     notes: () => <Notes2 sub={sub} />,
     expenses: () => <Money2 sub={sub} />,
     favourites: () => <People2 sub={sub} />,
+    books: () => <Suspense fallback={<Skeleton tiles={[["s12", 220], ["s12", 300]]} />}><Books2 sub={sub} /></Suspense>,
   };
   const body = (sc) => (
     <>
