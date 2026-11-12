@@ -1,5 +1,6 @@
 const mysql = require('mysql2/promise');
-require('dotenv').config();
+// Values in backend/.env win over the host's environment (cPanel can pass empty DB_* values)
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env'), override: true });
 
 const dbHost = process.env.DB_HOST || "localhost";
 const dbPort = Number(process.env.DB_PORT) || 3306;
