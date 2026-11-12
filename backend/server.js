@@ -31,6 +31,20 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
+// Clean URLs (/activities, /books/4/161): when the host sends page requests to Node
+// (cPanel/Passenger on the same domain), answer with the built index.html.
+// Runs before helmet so the API CSP doesn't block the app's fonts and inline theme script.
+const FRONTEND_DIR = process.env.FRONTEND_DIR || path.join(__dirname, "public");
+const SPA_INDEX = path.join(FRONTEND_DIR, "index.html");
+if (require("fs").existsSync(SPA_INDEX)) {
+  app.use(express.static(FRONTEND_DIR, { index: false }));
+  app.use((req, res, next) => {
+    if ((req.method !== "GET" && req.method !== "HEAD") || /^\/(api|uploads)(\/|$)/.test(req.path) || !req.accepts("html")) return next();
+    res.set("Cache-Control", "no-cache");
+    res.sendFile(SPA_INDEX);
+  });
+}
+
 // Helmet — sets secure HTTP response headers incl. HSTS
 app.use(
   helmet({

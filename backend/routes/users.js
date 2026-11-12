@@ -10,7 +10,7 @@ const v = require("../middleware/validators");
 // Public routes
 router.post("/register",  v.registerRules, v.validate, userController.register);
 router.post("/login",     v.loginRules,    v.validate, userController.login);
-router.post("/login/2fa", v.verify2FARules, v.validate, userController.loginVerify2FA);
+router.post("/login/2fa", v.login2FARules, v.validate, userController.loginVerify2FA);
 router.post("/logout",    userController.logout);
 router.post("/refresh",   tokenController.refresh);
 router.post("/demo-login", require("../controllers/demoController").demoLogin);

@@ -104,6 +104,9 @@ exports.createNote = async (req, res) => {
     }
 
     // Support both old format (single answer) and new format (multiple answers)
+    const answerList = answers && Array.isArray(answers) && answers.length > 0
+      ? answers
+      : (answer ? [{ answer: String(answer).trim(), is_very_good: false }] : []);
 
     if (answerList.length === 0) {
       console.error("Validation failed: No answers provided");

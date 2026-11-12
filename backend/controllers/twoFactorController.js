@@ -8,19 +8,23 @@ const { revokeAll } = require("./tokenController");
 // Step 1: Generate TOTP secret and return QR code (does not enable 2FA yet)
 exports.setup = async (req, res) => {
   try {
-    const secret = speakeasy.generateSecret({
-      name: `ActivityTracker (${req.user.username})`,
-      length: 20,
-    });
+    const [[u]] = await db.query("SELECT totp_secret, totp_enabled FROM users WHERE id = ?", [req.user.id]);
+    if (u?.totp_enabled) return res.status(400).json({ error: "2FA is already on" });
 
-    await db.query(
-      "UPDATE users SET totp_secret = ?, totp_enabled = 0 WHERE id = ?",
-      [secret.base32, req.user.id]
-    );
+    // Reuse a pending (not yet enabled) secret, so a repeated setup call — React StrictMode, reopening
+    // the dialog — doesn't silently invalidate the code already scanned into the authenticator app.
+    // Only fill an empty slot and then read back what's stored: two setup calls arriving together
+    // (StrictMode fires both at once) must both answer with the one secret that won.
+    if (!u?.totp_secret) {
+      await db.query("UPDATE users SET totp_secret = ? WHERE id = ? AND totp_secret IS NULL AND totp_enabled = 0",
+        [speakeasy.generateSecret({ length: 20 }).base32, req.user.id]);
+    }
+    const [[{ totp_secret: base32 }]] = await db.query("SELECT totp_secret FROM users WHERE id = ?", [req.user.id]);
+    const url = speakeasy.otpauthURL({ secret: base32, encoding: "base32", label: `ActivityTracker (${req.user.username})` });
 
-    const qrDataUrl = await qrcode.toDataURL(secret.otpauth_url);
+    const qrDataUrl = await qrcode.toDataURL(url);
 
-    res.json({ qr_code_data_url: qrDataUrl, secret: secret.base32 });
+    res.json({ qr_code_data_url: qrDataUrl, secret: base32 });
   } catch (error) {
     console.error("2FA setup error:", error);
     res.status(500).json({ error: "Failed to set up 2FA" });

@@ -73,7 +73,7 @@ exports.updateCompletionRules = [
   body("activityId").isInt({ min: 1 }).withMessage("Invalid activity ID"),
   body("date").isDate().withMessage("Invalid date format (YYYY-MM-DD required)"),
   body("isCompleted").optional().isBoolean().withMessage("isCompleted must be boolean"),
-  body("note").optional().isLength({ max: 2000 }).withMessage("Note too long"),
+  body("note").optional().isLength({ max: 15000 }).withMessage("Note too long"), // JSON array of HTML notes
 ];
 
 // ── Notes ─────────────────────────────────────────────────────────────────────
@@ -136,7 +136,7 @@ exports.saveQazaRules = [
 // ── Sticky Notes ──────────────────────────────────────────────────────────────
 exports.stickyNoteRules = [
   body("text").trim().notEmpty().withMessage("Note text is required")
-    .isLength({ max: 5000 }).withMessage("Note text too long"),
+    .isLength({ max: 15000 }).withMessage("Note text too long"),
   body("color").optional().matches(/^#[0-9a-fA-F]{3,6}$/).withMessage("Invalid color"),
 ];
 
@@ -147,6 +147,11 @@ exports.stickyNoteIdRules = [
 // ── 2FA ───────────────────────────────────────────────────────────────────────
 exports.verify2FARules = [
   body("token").notEmpty().isLength({ min: 6, max: 6 }).isNumeric()
+    .withMessage("Invalid 2FA token — must be a 6-digit code"),
+];
+// sign-in step two sends the code as totpToken alongside the temp token
+exports.login2FARules = [
+  body("totpToken").notEmpty().isLength({ min: 6, max: 6 }).isNumeric()
     .withMessage("Invalid 2FA token — must be a 6-digit code"),
 ];
 
@@ -273,12 +278,12 @@ exports.personNoteRules = [
 // ── Notes — Answers ──────────────────────────────────────────────────────────
 exports.createAnswerRules = [
   body("answer").trim().notEmpty().withMessage("Answer required")
-    .isLength({ max: 10000 }).withMessage("Answer must be under 10,000 characters"),
+    .isLength({ max: 50000 }).withMessage("Answer must be under 50,000 characters"),
   body("display_order").optional().isInt({ min: 0 }).withMessage("Invalid display order"),
 ];
 
 exports.updateAnswerRules = [
-  body("answer").optional().trim().isLength({ max: 10000 }).withMessage("Answer too long"),
+  body("answer").optional().trim().isLength({ max: 50000 }).withMessage("Answer too long"),
   body("display_order").optional().isInt({ min: 0 }).withMessage("Invalid display order"),
 ];
 

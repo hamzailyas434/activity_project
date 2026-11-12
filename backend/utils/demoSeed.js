@@ -58,8 +58,8 @@ const NOTES = [
   ["German", "Akkusativ vs Dativ articles", ["Akk: den / die / das / die. Dat: dem / der / dem / den (+n on plural nouns).", "Mnemonic for Dativ prepositions: aus-bei-mit-nach-seit-von-zu."], true],
   ["German", "How do I say 'I have been studying for two hours'?", ["Ich lerne seit zwei Stunden. (German uses present tense with seit.)"]],
   ["Exam prep", "Pomodoro setup that works for me", ["50 min focus / 10 min break, phone in another room. After 3 rounds take a 30 min walk."]],
-  ["Exam prep", "Checklist the night before an exam", ["Admit card + ID, two pens, calculator with fresh battery, water bottle. Sleep by 11. No new topics after 9 pm."]],
-  ["Career", "Elevator pitch for internship fairs", ["I'm a 5th-semester CS student who builds small full-stack apps — most recently a habit tracker with React and Node. I'm looking for a summer internship where I can ship real features."]],
+  ["Exam prep", "Checklist the night before an exam", ["Student ID, two pens, calculator with fresh battery, water bottle. Sleep by 11. No new topics after 9 pm."]],
+  ["Career", "Elevator pitch for internship fairs", ["I'm a junior CS major who builds small full-stack apps — most recently a habit tracker with React and Node. I'm looking for a summer internship where I can ship real features."]],
 ];
 
 const STICKIES = [["DBMS quiz on Thursday — revise joins + normalisation", "gold"], ["Return library book by the 30th", "red"], ["Group project standup: Mon & Thu 6 pm", "blue"], ["Gym bag in the car 🏃", "green"]];
@@ -74,25 +74,25 @@ const JOURNAL = [
   [3, "Long lab day. Barely got anything else done but the lab report draft is ready."],
   [7, "Morning run felt great. Studied in the library till 6 — very productive."],
   [12, "Bad sleep, skipped the run. Still did the problem set. Small wins."],
-  [15, "Submitted the physics report. Treated myself to biryani with Ahmed."],
+  [15, "Submitted the physics report. Grabbed pizza with Jake to celebrate."],
   [18, "Weekend. Mostly rested, did German and flashcards in the evening."],
   [21, "Mock DBMS quiz: 7/10. Need to revise transactions and isolation levels."],
   [24, "Group project meeting went well — I'm doing the login and dashboard screens."],
 ];
 
-const EXPENSES = [ // name, category, amount, day, note
-  ["Hostel rent", "home_bills", 18000, 1, "Paid to warden"], ["Internet (shared)", "home_bills", 1500, 5, ""], ["Mobile package", "home_bills", 800, 3, ""],
-  ["Mess / food", "other", 9000, 2, "Monthly mess card"], ["Books & printouts", "other", 2400, 9, "DBMS notes + lab manual"], ["Transport", "other", 3000, 4, "Careem + metro card"],
-  ["Coffee with friends", "other", 1200, 14, ""], ["Gym membership", "other", 2500, 6, ""], ["Sent home", "home_person", 5000, 10, "For Mom"],
+const EXPENSES = [ // name, category, amount (USD), day, note
+  ["Apartment rent (shared)", "home_bills", 750, 1, "Venmo to landlord"], ["Internet (shared)", "home_bills", 25, 5, ""], ["Phone plan", "home_bills", 35, 3, ""],
+  ["Groceries", "other", 280, 2, "Trader Joe's + Costco run"], ["Textbooks & printing", "other", 90, 9, "DBMS textbook rental"], ["Transport", "other", 65, 4, "Bus pass + a few Ubers"],
+  ["Coffee with friends", "other", 45, 14, ""], ["Gym membership", "other", 30, 6, ""], ["Family phone plan", "home_person", 40, 10, "My share on Mom's plan"],
 ];
-const INCOME = [52000, 55000, 58000]; // two months ago → this month
+const INCOME = [1350, 1400, 1480]; // campus job, two months ago → this month
 
 const PEOPLE = [
-  { name: "Mom", relation: "Parent", color: "red", bday: "1974-03-12", shoe: "38", dress: "Maroon", notes: "Loves green tea and hand-written cards.", prefs: [["Perfume", "Soft floral, not too strong"], ["Books", "Urdu poetry"]], gifts: [[-200, "Scarf", 3500, "red"], [-160, "Flowers", 1500, "violet"]] },
-  { name: "Dad", relation: "Parent", color: "blue", bday: "1970-11-02", shoe: "43", dress: "Navy", notes: "Always asks about exams first.", prefs: [["Gadgets", "Wants a fitness band"], ["Clothes", "Plain kurta, size L"]], gifts: [[8, "Fitness band", 0, "blue", "dena hai — saving up"]] },
-  { name: "Sara", relation: "Sibling", color: "violet", bday: "2009-10-22", shoe: "37", dress: "Lavender", notes: "In 10th grade, into sketching.", prefs: [["Books", "Graphic novels"], ["Gadgets", "Drawing tablet someday"]], gifts: [[-3, "Sketchbook + pens", 2500, "violet"]] },
-  { name: "Ahmed", relation: "Friend", color: "green", bday: "2005-01-19", shoe: "42", dress: "Black", notes: "Roommate. Study partner for DBMS.", prefs: [["Books", "Sci-fi"]], gifts: [] },
-  { name: "Prof. Hina Malik", relation: "Colleague", color: "gold", bday: null, shoe: "", dress: "", notes: "Project supervisor. Office hours Tue 2–4 pm.", prefs: [], gifts: [] },
+  { name: "Mom", relation: "Parent", color: "red", bday: "1974-03-12", shoe: "7.5 US", dress: "Burgundy", notes: "Loves chai lattes and hand-written cards.", prefs: [["Perfume", "Soft floral, not too strong"], ["Books", "Mary Oliver poetry"]], gifts: [[-200, "Cashmere scarf", 45, "red"], [-160, "Flowers", 25, "violet"]] },
+  { name: "Dad", relation: "Parent", color: "blue", bday: "1970-11-02", shoe: "10 US", dress: "Navy", notes: "Always asks about exams first. Big Yankees fan.", prefs: [["Gadgets", "Wants a fitness band"], ["Clothes", "Flannel shirts, size L"]], gifts: [[8, "Fitness band", 0, "blue", "saving up for it"]] },
+  { name: "Lily", relation: "Sibling", color: "violet", bday: "2009-10-22", shoe: "6.5 US", dress: "Lavender", notes: "Sophomore in high school, into sketching.", prefs: [["Books", "Graphic novels"], ["Gadgets", "Drawing tablet someday"]], gifts: [[-3, "Sketchbook + pens", 30, "violet"]] },
+  { name: "Jake", relation: "Friend", color: "green", bday: "2005-01-19", shoe: "11 US", dress: "Black", notes: "Roommate. Study partner for DBMS.", prefs: [["Books", "Sci-fi"]], gifts: [] },
+  { name: "Prof. Sarah Mitchell", relation: "Colleague", color: "gold", bday: null, shoe: "", dress: "", notes: "Project advisor. Office hours Tue 2–4 pm.", prefs: [], gifts: [] },
 ];
 
 const BOOK_PAGES = [
@@ -226,7 +226,7 @@ async function seedUserData(c, uid) {
   months.forEach(([y, m], k) => {
     EXPENSES.forEach(([name, cat, amount, day, note], i) => {
       if (k === 2 && day > today.getDate()) return;
-      const amt = cat === "home_bills" ? amount : Math.round((amount * (0.8 + rnd() * 0.4)) / 50) * 50;
+      const amt = cat === "home_bills" ? amount : Math.round((amount * (0.8 + rnd() * 0.4)) / 5) * 5; // whole $5 steps
       exp.push([uid, cat, name, amt, note, m, y, i, `${y}-${pad(m)}-${pad(day)}`]);
     });
   });
@@ -234,7 +234,7 @@ async function seedUserData(c, uid) {
   await many("INSERT INTO expenses (user_id, category, name, amount, note, month, year, display_order, bill_date) VALUES ?", exp);
   await many("INSERT INTO expense_budgets (user_id, month, year, total_income, remaining_sent_home) VALUES ?", months.map(([y, m], k) => [uid, m, y, INCOME[k], k === 1 ? 1 : 0]));
   await many("INSERT INTO person_ledger (user_id, person_name, month, year, amount, other_amount, note) VALUES ?",
-    [[uid, "Ahmed", cm, cy, 3000, 0, "Lent for textbooks"], [uid, "Mom", cm, cy, 5000, 2000, "Holding for Sara's school fee"]]);
+    [[uid, "Jake", cm, cy, 60, 0, "Lent for concert tickets"], [uid, "Mom", cm, cy, 150, 50, "Holding for Lily's school trip"]]);
 
   // people
   for (const p of PEOPLE) {
@@ -279,7 +279,7 @@ async function resetDemoUser(userId) {
     await c.beginTransaction();
     oldFiles = await wipeUserData(c, userId);
     await seedUserData(c, userId);
-    await c.query("UPDATE users SET demo_reset_at = NOW(), first_name = 'Ayesha', last_name = 'Khan', profile_picture = NULL, hidden_tabs = ?, totp_enabled = 0, totp_secret = NULL, failed_login_attempts = 0, lockout_until = NULL WHERE id = ?",
+    await c.query("UPDATE users SET demo_reset_at = NOW(), first_name = 'Emily', last_name = 'Carter', profile_picture = NULL, hidden_tabs = ?, totp_enabled = 0, totp_secret = NULL, failed_login_attempts = 0, lockout_until = NULL WHERE id = ?",
       [JSON.stringify(["qaza-namaz"]), userId]);
     await c.commit();
   } catch (err) {
@@ -300,7 +300,7 @@ async function createDemoUser() {
   // nobody knows this password: demo accounts only open through /api/users/demo-login
   const hash = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
   const r = await db.query(
-    "INSERT INTO users (username, email, password_hash, first_name, last_name, role, hidden_tabs, is_demo) VALUES (?, ?, ?, 'Ayesha', 'Khan', 'user', ?, 1)",
+    "INSERT INTO users (username, email, password_hash, first_name, last_name, role, hidden_tabs, is_demo) VALUES (?, ?, ?, 'Emily', 'Carter', 'user', ?, 1)",
     [username, `${username}@demo.rhythm.test`, hash, JSON.stringify(["qaza-namaz"])]
   );
   const id = r[0].insertId;
